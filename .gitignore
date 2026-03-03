@@ -1,0 +1,15 @@
+# Secrets
+.env
+secrets.yaml
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/lib/
+
+# Node
+node_modules/
+workflow/workflow/node_modules/
+
+# OS
+.DS_Store
