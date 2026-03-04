@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {GhostFundVault} from "../src/GhostFundVault.sol";
 import {GhostToken} from "../src/GhostToken.sol";
 import {MockPool} from "../src/MockPool.sol";
@@ -68,6 +68,15 @@ contract GhostFundVaultTest is Test {
         vault.onReport(metadata, report);
     }
 
+    function test_onReport_revertsIfInvalidAction() public {
+        bytes memory metadata = _buildMetadata(workflowOwner);
+        bytes memory report = abi.encode(uint8(3), address(token), uint256(1000), uint256(500));
+
+        vm.prank(forwarder);
+        vm.expectRevert(abi.encodeWithSelector(GhostFundVault.InvalidAction.selector, uint8(3)));
+        vault.onReport(metadata, report);
+    }
+
     // ═══════════════════════════════════════════
     // userApprove tests
     // ═══════════════════════════════════════════
@@ -130,7 +139,7 @@ contract GhostFundVaultTest is Test {
         vault.onReport(metadata, report);
 
         vm.prank(alice); // Not owner
-        vm.expectRevert(); // OwnerIsCreator revert
+        vm.expectRevert(bytes("Only callable by owner"));
         vault.userApprove(0);
     }
 
@@ -159,6 +168,12 @@ contract GhostFundVaultTest is Test {
 
     function test_getVaultBalance() public view {
         assertEq(vault.getVaultBalance(address(token)), 100_000 ether);
+    }
+
+    function test_getAavePosition_handlesMockWithoutAToken() public view {
+        (uint256 apy, uint256 balance) = vault.getAavePosition(address(token));
+        assertEq(apy, uint256(50000000000000000000000000));
+        assertEq(balance, 0);
     }
 
     function test_getLatestRecommendation_revertsIfEmpty() public {

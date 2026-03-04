@@ -60,6 +60,7 @@ contract GhostFundVault is IReceiver, OwnerIsCreator {
 
     error MustBeKeystoneForwarder();
     error UnauthorizedWorkflowOwner(address owner);
+    error InvalidAction(uint8 action);
     error RecommendationNotFound();
     error RecommendationAlreadyExecuted();
     error RecommendationExpired();
@@ -95,6 +96,9 @@ contract GhostFundVault is IReceiver, OwnerIsCreator {
 
         (uint8 action, address asset, uint256 amount, uint256 apy) =
             abi.decode(report, (uint8, address, uint256, uint256));
+        if (action == uint8(Action.NONE) || action > uint8(Action.WITHDRAW_FROM_POOL)) {
+            revert InvalidAction(action);
+        }
 
         uint256 recId = recommendationCount++;
         recommendations[recId] = Recommendation({
@@ -197,6 +201,7 @@ contract GhostFundVault is IReceiver, OwnerIsCreator {
     function getAavePosition(address asset) external view returns (uint256 apy, uint256 balance) {
         DataTypes.ReserveDataLegacy memory data = aavePool.getReserveData(asset);
         apy = uint256(data.currentLiquidityRate);
+        if (data.aTokenAddress == address(0)) return (apy, 0);
         balance = IERC20(data.aTokenAddress).balanceOf(address(this));
     }
 
