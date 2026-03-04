@@ -6,7 +6,7 @@ solc_version = "0.8.26"
 evm_version = "cancun"
 
 remappings = [
-    "@chainlink/contracts/=lib/chainlink/contracts/",
+    "@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@chainlink/policy-management/=lib/chainlink-ace/packages/policy-management/src/",
     "forge-std/=lib/forge-std/src/",
