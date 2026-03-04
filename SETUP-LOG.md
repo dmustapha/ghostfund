@@ -7,3 +7,5 @@ CONFIDENTIAL_HTTP=YES, class=ConfidentialHTTPClient, constructor=new ClientCapab
 EIP712_SIGNING=YES
 PT_API=LIVE (HTTP200 bad request on dummy auth payload)
 AAVE_V3=LIVE
+AAVE_SUPPLY=WORKS (asset=LINK)
+AAVE_VAULT_INTEGRATION=VERIFIED
