@@ -1,0 +1,10 @@
+{
+  "name": "ghostfund-v2-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.0.9",
+    "viem": "2.34.0",
+    "zod": "3.25.76"
+  }
+}

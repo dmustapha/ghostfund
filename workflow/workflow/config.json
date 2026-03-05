@@ -1,0 +1,14 @@
+{
+  "schedule": "0 */5 * * * *",
+  "apyThresholdBps": 200,
+  "priceApiUrl": "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=usd",
+  "evms": [
+    {
+      "assetAddress": "REPLACE_WITH_TOKEN_ADDRESS",
+      "poolAddress": "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
+      "ghostFundVaultAddress": "REPLACE_AFTER_DEPLOY",
+      "chainName": "ethereum-testnet-sepolia",
+      "gasLimit": "500000"
+    }
+  ]
+}
