@@ -1,9 +1,12 @@
 import 'dotenv/config'
 import { execSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const ROOT = '/Users/MAC/hackathon-toolkit/active/ghostfund-v2'
+const THIS_DIR = path.dirname(fileURLToPath(import.meta.url))
+const ROOT = path.resolve(THIS_DIR, '..')
 const SCRIPTS = `${ROOT}/scripts`
-const BUN = '/Users/MAC/.bun/bin/bun'
+const BUN = process.env.BUN_BIN ?? 'bun'
 
 function requireEnv(name: string): string {
   const v = process.env[name]
