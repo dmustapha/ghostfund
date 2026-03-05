@@ -158,11 +158,23 @@ async function main() {
   } else {
     const adminKey = requireEnv('PRIVATE_KEY')
     console.log(
-      run('cast', ['send', pausePolicy, 'pause()', '--rpc-url', rpc, '--private-key', adminKey], ROOT, {}, [adminKey])
+      run(
+        'cast',
+        ['send', pausePolicy, 'setPausedState(bool)', 'true', '--rpc-url', rpc, '--private-key', adminKey],
+        ROOT,
+        {},
+        [adminKey]
+      )
     )
     await expectDepositBlocked(client, deployer, token, 1n, 'paused deposit')
     console.log(
-      run('cast', ['send', pausePolicy, 'unpause()', '--rpc-url', rpc, '--private-key', adminKey], ROOT, {}, [adminKey])
+      run(
+        'cast',
+        ['send', pausePolicy, 'setPausedState(bool)', 'false', '--rpc-url', rpc, '--private-key', adminKey],
+        ROOT,
+        {},
+        [adminKey]
+      )
     )
     await expectDepositAllowed(client, deployer, token, 1n)
   }
