@@ -4,9 +4,9 @@
   "priceApiUrl": "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=usd",
   "evms": [
     {
-      "assetAddress": "REPLACE_WITH_TOKEN_ADDRESS",
+      "assetAddress": "0xf8Fb3713D459D7C1018BD0A49D19b4C44290EBE5",
       "poolAddress": "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
-      "ghostFundVaultAddress": "REPLACE_AFTER_DEPLOY",
+      "ghostFundVaultAddress": "0x4964991514f731CB3CF252108dFF889d30036fcb",
       "chainName": "ethereum-testnet-sepolia",
       "gasLimit": "500000"
     }
