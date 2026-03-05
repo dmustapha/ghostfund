@@ -13,3 +13,4 @@ workflow/workflow/node_modules/
 
 # OS
 .DS_Store
+workflow/workflow/.cre_build_tmp.*

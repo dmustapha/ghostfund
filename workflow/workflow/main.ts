@@ -16,8 +16,6 @@ import {
   decodeFunctionResult,
   encodeAbiParameters,
   encodeFunctionData,
-  formatUnits,
-  type Hex,
   parseAbiParameters,
   zeroAddress,
 } from 'viem'
@@ -105,7 +103,7 @@ const ACTION_WITHDRAW = 2
 
 function readAaveAPY(
   evmClient: EVMClient,
-  runtime: Runtime,
+  runtime: Runtime<Config>,
   poolAddress: Address,
   assetAddress: Address
 ): { liquidityRate: bigint; aTokenAddress: Address } {
@@ -144,7 +142,7 @@ function readAaveAPY(
 
 function readBalance(
   evmClient: EVMClient,
-  runtime: Runtime,
+  runtime: Runtime<Config>,
   tokenAddress: Address,
   account: Address
 ): bigint {
@@ -178,19 +176,19 @@ function readBalance(
 // HELPER: Fetch Price (CoinGecko)
 // ═══════════════════════════════════════════════════
 
-function fetchPrice(runtime: Runtime, priceApiUrl: string): number {
+function fetchPrice(runtime: Runtime<Config>, priceApiUrl: string): number {
   const httpCapability = new cre.capabilities.HTTPClient()
 
   // ⚠️ UNVERIFIED: ConsensusAggregation pattern may differ.
   // If this fails, hardcode price for demo (USDC = 1.0).
   try {
-    const result = httpCapability.sendRequest(runtime, {
+    const result = httpCapability.sendRequest(runtime as any, {
       method: 'GET',
       url: priceApiUrl,
     }).result()
 
     const body = JSON.parse(Buffer.from(result.body).toString('utf-8'))
-    return body['usd-coin']?.usd ?? 1.0
+    return body['chainlink']?.usd ?? 1.0
   } catch {
     // Fallback: assume USDC = $1.00 for demo
     return 1.0
@@ -237,6 +235,9 @@ async function onCronTrigger(runtime: Runtime<Config>, _payload: CronPayload): P
       chainSelectorName: evmCfg.chainName,
       isTestnet: true,
     })
+    if (!network) {
+      throw new Error('Network not found for chain selector name: ' + evmCfg.chainName)
+    }
     const evmClient = new cre.capabilities.EVMClient(network.chainSelector.selector)
 
     // 1. Read Aave APY
