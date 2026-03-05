@@ -4,7 +4,19 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import { PT_DOMAIN, PT_TYPES, PT_API_BASE } from './constants.js'
 
-const account = privateKeyToAccount(`0x${process.env.PRIVATE_KEY}` as `0x${string}`)
+const privateKey = (() => {
+  const raw = process.env.PRIVATE_KEY ?? ''
+  const normalized = raw.startsWith('0x') ? raw.slice(2) : raw
+  return `0x${normalized}` as `0x${string}`
+})()
+
+const account = privateKeyToAccount(privateKey)
+type PTSigner = typeof account
+
+export function accountFromPrivateKey(rawPrivateKey: string): PTSigner {
+  const normalized = rawPrivateKey.startsWith('0x') ? rawPrivateKey.slice(2) : rawPrivateKey
+  return privateKeyToAccount(`0x${normalized}` as `0x${string}`)
+}
 
 createWalletClient({
   account,
@@ -14,9 +26,10 @@ createWalletClient({
 
 export async function signPTRequest<T extends keyof typeof PT_TYPES>(
   primaryType: T,
-  message: Record<string, unknown>
+  message: Record<string, unknown>,
+  signer: PTSigner = account
 ): Promise<string> {
-  return account.signTypedData({
+  return signer.signTypedData({
     domain: PT_DOMAIN,
     types: PT_TYPES,
     primaryType,
@@ -29,19 +42,20 @@ export function currentTimestamp(): bigint {
 }
 
 export async function checkBalance(
-  accountAddress: string
+  accountAddress: string,
+  signer: PTSigner = account
 ): Promise<{ balances: Array<{ token: string; amount: string }> }> {
   const timestamp = currentTimestamp()
   const message = { account: accountAddress, timestamp }
 
-  const signature = await signPTRequest('Retrieve Balances', message)
+  const signature = await signPTRequest('Retrieve Balances', message, signer)
 
   const response = await fetch(`${PT_API_BASE}/balances`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       account: accountAddress,
-      timestamp: timestamp.toString(),
+      timestamp: Number(timestamp),
       auth: signature,
     }),
   })
@@ -55,19 +69,20 @@ export async function checkBalance(
 }
 
 export async function generateShieldedAddress(
-  accountAddress: string
+  accountAddress: string,
+  signer: PTSigner = account
 ): Promise<{ address: string }> {
   const timestamp = currentTimestamp()
   const message = { account: accountAddress, timestamp }
 
-  const signature = await signPTRequest('Generate Shielded Address', message)
+  const signature = await signPTRequest('Generate Shielded Address', message, signer)
 
   const response = await fetch(`${PT_API_BASE}/shielded-address`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       account: accountAddress,
-      timestamp: timestamp.toString(),
+      timestamp: Number(timestamp),
       auth: signature,
     }),
   })
@@ -85,11 +100,12 @@ export async function privateTransfer(
   recipientAddress: string,
   tokenAddress: string,
   amount: string,
-  flags: string[] = ['hide-sender']
+  flags: string[] = ['hide-sender'],
+  signer: PTSigner = account
 ): Promise<{ transaction_id: string }> {
   const timestamp = currentTimestamp()
   const message = {
-    account: senderAddress,
+    sender: senderAddress,
     recipient: recipientAddress,
     token: tokenAddress,
     amount: BigInt(amount),
@@ -97,7 +113,7 @@ export async function privateTransfer(
     timestamp,
   }
 
-  const signature = await signPTRequest('Private Token Transfer', message)
+  const signature = await signPTRequest('Private Token Transfer', message, signer)
 
   const response = await fetch(`${PT_API_BASE}/private-transfer`, {
     method: 'POST',
@@ -108,7 +124,7 @@ export async function privateTransfer(
       token: tokenAddress,
       amount,
       flags,
-      timestamp: timestamp.toString(),
+      timestamp: Number(timestamp),
       auth: signature,
     }),
   })
@@ -124,7 +140,8 @@ export async function privateTransfer(
 export async function getWithdrawTicket(
   accountAddress: string,
   tokenAddress: string,
-  amount: string
+  amount: string,
+  signer: PTSigner = account
 ): Promise<{ ticket: string; deadline: number }> {
   const timestamp = currentTimestamp()
   const message = {
@@ -134,7 +151,7 @@ export async function getWithdrawTicket(
     timestamp,
   }
 
-  const signature = await signPTRequest('Withdraw Tokens', message)
+  const signature = await signPTRequest('Withdraw Tokens', message, signer)
 
   const response = await fetch(`${PT_API_BASE}/withdraw`, {
     method: 'POST',
@@ -143,7 +160,7 @@ export async function getWithdrawTicket(
       account: accountAddress,
       token: tokenAddress,
       amount,
-      timestamp: timestamp.toString(),
+      timestamp: Number(timestamp),
       auth: signature,
     }),
   })
@@ -157,19 +174,24 @@ export async function getWithdrawTicket(
 }
 
 export async function listTransactions(
-  accountAddress: string
+  accountAddress: string,
+  limit = 10,
+  cursor = '',
+  signer: PTSigner = account
 ): Promise<{ transactions: Array<unknown> }> {
   const timestamp = currentTimestamp()
-  const message = { account: accountAddress, timestamp }
+  const message = { account: accountAddress, timestamp, cursor, limit }
 
-  const signature = await signPTRequest('List Transactions', message)
+  const signature = await signPTRequest('List Transactions', message, signer)
 
   const response = await fetch(`${PT_API_BASE}/transactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       account: accountAddress,
-      timestamp: timestamp.toString(),
+      timestamp: Number(timestamp),
+      limit,
+      ...(cursor ? { cursor } : {}),
       auth: signature,
     }),
   })

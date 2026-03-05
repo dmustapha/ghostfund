@@ -17,9 +17,11 @@ export const PT_TYPES = {
   'List Transactions': [
     { name: 'account', type: 'address' },
     { name: 'timestamp', type: 'uint256' },
+    { name: 'cursor', type: 'string' },
+    { name: 'limit', type: 'uint256' },
   ],
   'Private Token Transfer': [
-    { name: 'account', type: 'address' },
+    { name: 'sender', type: 'address' },
     { name: 'recipient', type: 'address' },
     { name: 'token', type: 'address' },
     { name: 'amount', type: 'uint256' },
