@@ -5,6 +5,8 @@ import {Script, console} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PolicyEngine} from "@chainlink/policy-management/core/PolicyEngine.sol";
 import {AllowPolicy} from "@chainlink/policy-management/policies/AllowPolicy.sol";
+import {MaxPolicy} from "@chainlink/policy-management/policies/MaxPolicy.sol";
+import {PausePolicy} from "@chainlink/policy-management/policies/PausePolicy.sol";
 
 contract DeployACE is Script {
     function run() external {
@@ -33,6 +35,28 @@ contract DeployACE is Script {
         );
         ERC1967Proxy allowProxy = new ERC1967Proxy(address(allowImpl), allowInitData);
         console.log("AllowPolicy:", address(allowProxy));
+
+        // 3) Deploy MaxPolicy (proxy) with conservative max limit
+        MaxPolicy maxImpl = new MaxPolicy();
+        bytes memory maxInitData = abi.encodeWithSignature(
+            "initialize(address,address,bytes)",
+            address(peProxy),
+            deployer,
+            abi.encode(uint256(1_000_000 ether))
+        );
+        ERC1967Proxy maxProxy = new ERC1967Proxy(address(maxImpl), maxInitData);
+        console.log("MaxPolicy:", address(maxProxy));
+
+        // 4) Deploy PausePolicy (proxy) default unpaused
+        PausePolicy pauseImpl = new PausePolicy();
+        bytes memory pauseInitData = abi.encodeWithSignature(
+            "initialize(address,address,bytes)",
+            address(peProxy),
+            deployer,
+            abi.encode(false)
+        );
+        ERC1967Proxy pauseProxy = new ERC1967Proxy(address(pauseImpl), pauseInitData);
+        console.log("PausePolicy:", address(pauseProxy));
 
         vm.stopBroadcast();
     }
