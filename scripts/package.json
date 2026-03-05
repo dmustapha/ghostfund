@@ -1,0 +1,9 @@
+{
+  "name": "ghostfund-v2-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "viem": "2.34.0",
+    "dotenv": "^16.4.0"
+  }
+}
