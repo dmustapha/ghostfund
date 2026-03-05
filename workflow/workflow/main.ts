@@ -228,7 +228,7 @@ function decideStrategy(
 // CRON HANDLER
 // ═══════════════════════════════════════════════════
 
-function onCronTrigger(runtime: Runtime, _payload: CronPayload) {
+async function onCronTrigger(runtime: Runtime<Config>, _payload: CronPayload): Promise<string> {
   const config = configSchema.parse(runtime.config)
 
   for (const evmCfg of config.evms) {
@@ -308,6 +308,7 @@ function onCronTrigger(runtime: Runtime, _payload: CronPayload) {
 
     console.log(`Report written: action=${action}, amount=${amount}, apy=${apyBps}bps`)
   }
+  return "ok"
 }
 
 // ═══════════════════════════════════════════════════
