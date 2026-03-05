@@ -1,7 +1,7 @@
 {
   "schedule": "0 */5 * * * *",
   "apyThresholdBps": 200,
-  "priceApiUrl": "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=usd",
+  "priceApiUrl": "https://api.coingecko.com/api/v3/simple/price?ids=chainlink&vs_currencies=usd",
   "evms": [
     {
       "assetAddress": "0xf8Fb3713D459D7C1018BD0A49D19b4C44290EBE5",
