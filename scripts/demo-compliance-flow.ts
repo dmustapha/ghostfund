@@ -1,10 +1,10 @@
 import 'dotenv/config'
-import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createPublicClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
+import { runCommand } from './lib/shell.js'
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(THIS_DIR, '..')
@@ -16,18 +16,25 @@ function requireEnv(name: string): string {
   return v
 }
 
-function run(cmd: string, cwd = ROOT): string {
-  return execSync(cmd, {
+function run(
+  cmd: string,
+  args: string[],
+  cwd = ROOT,
+  extraEnv: Record<string, string> = {},
+  secretValues: string[] = []
+): string {
+  return runCommand({
+    cmd,
+    args,
     cwd,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: process.env,
+    env: { ...process.env, ...extraEnv },
+    secretValues,
   })
 }
 
 function pickRpc(): string {
   try {
-    const rpc = run('./scripts/lib/select-sepolia-rpc.sh').trim()
+    const rpc = run('./scripts/lib/select-sepolia-rpc.sh', []).trim()
     if (rpc) return rpc
   } catch {
     // fallback below
@@ -149,9 +156,14 @@ async function main() {
   if (!pausePolicy) {
     console.log('PAUSE_POLICY_ADDRESS not set; skipping pause/unpause check.')
   } else {
-    console.log(run(`cast send ${pausePolicy} "pause()" --rpc-url ${rpc} --private-key ${requireEnv('PRIVATE_KEY')}`))
+    const adminKey = requireEnv('PRIVATE_KEY')
+    console.log(
+      run('cast', ['send', pausePolicy, 'pause()', '--rpc-url', rpc, '--private-key', adminKey], ROOT, {}, [adminKey])
+    )
     await expectDepositBlocked(client, deployer, token, 1n, 'paused deposit')
-    console.log(run(`cast send ${pausePolicy} "unpause()" --rpc-url ${rpc} --private-key ${requireEnv('PRIVATE_KEY')}`))
+    console.log(
+      run('cast', ['send', pausePolicy, 'unpause()', '--rpc-url', rpc, '--private-key', adminKey], ROOT, {}, [adminKey])
+    )
     await expectDepositAllowed(client, deployer, token, 1n)
   }
 
