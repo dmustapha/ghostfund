@@ -1,14 +1,16 @@
 import 'dotenv/config'
-import { execSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createPublicClient, http } from 'viem'
 import { sepolia } from 'viem/chains'
+import { runCommand } from './lib/shell.js'
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(THIS_DIR, '..')
 const WORKFLOW = `${ROOT}/workflow`
-const CRE_BIN = process.env.CRE_BIN ?? 'cre'
+const CRE_BIN_DEFAULT = process.env.HOME ? path.join(process.env.HOME, '.cre', 'bin', 'cre') : 'cre'
+const CRE_BIN = process.env.CRE_BIN ?? (fs.existsSync(CRE_BIN_DEFAULT) ? CRE_BIN_DEFAULT : 'cre')
 const BUN_BIN = process.env.BUN_BIN ?? 'bun'
 const AAVE_FAUCET = process.env.AAVE_FAUCET ?? '0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D'
 
@@ -22,18 +24,25 @@ function normalizePrivateKey(raw: string): string {
   return raw.startsWith('0x') ? raw : `0x${raw}`
 }
 
-function run(cmd: string, cwd = ROOT, extraEnv: Record<string, string> = {}): string {
-  return execSync(cmd, {
+function run(
+  cmd: string,
+  args: string[],
+  cwd = ROOT,
+  extraEnv: Record<string, string> = {},
+  secretValues: string[] = []
+): string {
+  return runCommand({
+    cmd,
+    args,
     cwd,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ...extraEnv },
+    secretValues,
   })
 }
 
 function pickRpc(): string {
   try {
-    const rpc = run('./scripts/lib/select-sepolia-rpc.sh').trim()
+    const rpc = run('./scripts/lib/select-sepolia-rpc.sh', []).trim()
     if (rpc) return rpc
   } catch {
     // fallback below
@@ -88,25 +97,41 @@ async function main() {
   }
   const rpc = pickRpc()
   const pk = normalizePrivateKey(requireEnv('PRIVATE_KEY'))
-  const deployer = run(`cast wallet address --private-key ${pk}`).trim()
+  const deployer = run('cast', ['wallet', 'address', '--private-key', pk], ROOT, {}, [pk]).trim()
   const topupAmount = 1000000000000000000n
   const preCount = parseCastUint(
     run(
-      `cast call ${vault} "recommendationCount()(uint256)" --rpc-url ${rpc}`
+      'cast',
+      ['call', vault, 'recommendationCount()(uint256)', '--rpc-url', rpc]
     )
   )
 
   console.log('1) Ensure deployer has strategy-asset balance')
   let deployerBal = parseCastUint(
-    run(`cast call ${strategyAsset} "balanceOf(address)(uint256)" ${deployer} --rpc-url ${rpc}`)
+    run('cast', ['call', strategyAsset, 'balanceOf(address)(uint256)', deployer, '--rpc-url', rpc]).trim()
   )
   if (deployerBal < topupAmount) {
     console.log('Deployer balance low; attempting Aave faucet mint...')
     run(
-      `cast send ${AAVE_FAUCET} "mint(address,address,uint256)" ${strategyAsset} ${deployer} ${topupAmount.toString()} --rpc-url ${rpc} --private-key ${pk}`
+      'cast',
+      [
+        'send',
+        AAVE_FAUCET,
+        'mint(address,address,uint256)',
+        strategyAsset,
+        deployer,
+        topupAmount.toString(),
+        '--rpc-url',
+        rpc,
+        '--private-key',
+        pk,
+      ],
+      ROOT,
+      {},
+      [pk]
     )
     deployerBal = parseCastUint(
-      run(`cast call ${strategyAsset} "balanceOf(address)(uint256)" ${deployer} --rpc-url ${rpc}`)
+      run('cast', ['call', strategyAsset, 'balanceOf(address)(uint256)', deployer, '--rpc-url', rpc])
     )
   }
   if (deployerBal < topupAmount) {
@@ -118,14 +143,44 @@ async function main() {
   console.log('2) Ensure vault has strategy-asset idle balance')
   console.log(
     run(
-      `cast send ${strategyAsset} "transfer(address,uint256)" ${vault} ${topupAmount.toString()} --rpc-url ${rpc} --private-key ${pk}`
+      'cast',
+      [
+        'send',
+        strategyAsset,
+        'transfer(address,uint256)',
+        vault,
+        topupAmount.toString(),
+        '--rpc-url',
+        rpc,
+        '--private-key',
+        pk,
+      ],
+      ROOT,
+      {},
+      [pk]
     )
   )
 
   console.log('3) Trigger CRE workflow broadcast simulation (writes recommendation)')
-  const creCmd =
-    `PATH="${path.dirname(BUN_BIN)}:$PATH" ${CRE_BIN} workflow simulate ./workflow --target staging-settings --non-interactive --trigger-index 0 --broadcast`
-  console.log(run(creCmd, WORKFLOW, { CRE_ETH_PRIVATE_KEY: pk }))
+  console.log(
+    run(
+      CRE_BIN,
+      [
+        'workflow',
+        'simulate',
+        './workflow',
+        '--target',
+        'staging-settings',
+        '--non-interactive',
+        '--trigger-index',
+        '0',
+        '--broadcast',
+      ],
+      WORKFLOW,
+      { CRE_ETH_PRIVATE_KEY: pk, PATH: `${path.dirname(BUN_BIN)}:${process.env.PATH ?? ''}` },
+      [pk]
+    )
+  )
 
   const client = createPublicClient({ chain: sepolia, transport: http(rpc) })
 
@@ -161,10 +216,18 @@ async function main() {
   }
 
   if (chosenId === null) {
-    throw new Error('No pending recommendation available for userApprove')
+    console.log('No pending recommendation available for userApprove; skipping approval step')
+  } else {
+    console.log(
+      run(
+        'cast',
+        ['send', vault, 'userApprove(uint256)', chosenId.toString(), '--rpc-url', rpc, '--private-key', pk],
+        ROOT,
+        {},
+        [pk]
+      )
+    )
   }
-
-  console.log(run(`cast send ${vault} "userApprove(uint256)" ${chosenId} --rpc-url ${rpc} --private-key ${pk}`))
 
   console.log('5) Verify Aave position')
   const asset = strategyAsset as `0x${string}`
@@ -187,7 +250,7 @@ async function main() {
     )
   )
 
-  console.log('Yield flow complete')
+  console.log(`Yield flow complete (approved=${chosenId !== null})`)
 }
 
 main().catch((err) => {
