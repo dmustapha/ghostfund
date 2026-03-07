@@ -13,9 +13,12 @@ contract DeployGhostFund is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // ⚠️ UNVERIFIED: KeystoneForwarder address — get from CRE simulation output
+        // ⚠️ HACKATHON NOTE: KEYSTONE_FORWARDER is set to the deployer EOA for CRE
+        // simulation compatibility. In production, replace with the actual Keystone
+        // Forwarder contract address from CRE deployment output. Until then, any
+        // transaction from this EOA will pass the onReport() access check.
         address keystoneForwarder = vm.envAddress("KEYSTONE_FORWARDER");
-        address workflowOwner = deployer; // Default: deployer owns the workflow
+        address workflowOwner = vm.envOr("WORKFLOW_OWNER", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 

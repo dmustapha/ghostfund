@@ -1,6 +1,7 @@
 {
   "schedule": "0 */5 * * * *",
   "apyThresholdBps": 200,
+  "minDepositAmount": "1000000",
   "priceApiUrl": "https://api.coingecko.com/api/v3/simple/price?ids=chainlink&vs_currencies=usd",
   "evms": [
     {

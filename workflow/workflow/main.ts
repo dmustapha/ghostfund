@@ -28,6 +28,7 @@ import { z } from 'zod'
 const configSchema = z.object({
   schedule: z.string(),
   apyThresholdBps: z.number(), // Minimum APY in basis points to recommend deposit
+  minDepositAmount: z.string().optional(), // Minimum deposit to avoid dust (wei string, default 0)
   priceApiUrl: z.string(),
   evms: z.array(
     z.object({
@@ -173,29 +174,6 @@ function readBalance(
 }
 
 // ═══════════════════════════════════════════════════
-// HELPER: Fetch Price (CoinGecko)
-// ═══════════════════════════════════════════════════
-
-function fetchPrice(runtime: Runtime<Config>, priceApiUrl: string): number {
-  const httpCapability = new cre.capabilities.HTTPClient()
-
-  // ⚠️ UNVERIFIED: ConsensusAggregation pattern may differ.
-  // If this fails, hardcode price for demo (USDC = 1.0).
-  try {
-    const result = httpCapability.sendRequest(runtime as any, {
-      method: 'GET',
-      url: priceApiUrl,
-    }).result()
-
-    const body = JSON.parse(Buffer.from(result.body).toString('utf-8'))
-    return body['chainlink']?.usd ?? 1.0
-  } catch {
-    // Fallback: assume USDC = $1.00 for demo
-    return 1.0
-  }
-}
-
-// ═══════════════════════════════════════════════════
 // STRATEGY LOGIC
 // ═══════════════════════════════════════════════════
 
@@ -203,13 +181,14 @@ function decideStrategy(
   liquidityRate: bigint,
   idleBalance: bigint,
   aaveBalance: bigint,
-  apyThresholdBps: number
+  apyThresholdBps: number,
+  minDepositAmount: bigint = 0n
 ): { action: number; amount: bigint; apyBps: number } {
   // Convert RAY rate to basis points: (rate * 10000) / RAY
   const apyBps = Number((liquidityRate * 10000n) / RAY)
 
-  // Case 1: Vault has idle tokens AND APY is above threshold → deposit
-  if (idleBalance > 0n && apyBps >= apyThresholdBps) {
+  // Case 1: Vault has idle tokens above dust threshold AND APY is above threshold → deposit
+  if (idleBalance > minDepositAmount && apyBps >= apyThresholdBps) {
     return { action: ACTION_DEPOSIT, amount: idleBalance, apyBps }
   }
 
@@ -261,30 +240,29 @@ async function onCronTrigger(runtime: Runtime<Config>, _payload: CronPayload): P
       ? readBalance(evmClient, runtime, aTokenAddress, evmCfg.ghostFundVaultAddress as Address)
       : 0n
 
-    // 4. Fetch price (optional, for display)
-    const _price = fetchPrice(runtime, config.priceApiUrl)
-
-    // 5. Strategy decision
+    // 4. Strategy decision
+    const minDeposit = config.minDepositAmount ? BigInt(config.minDepositAmount) : 0n
     const { action, amount, apyBps } = decideStrategy(
       liquidityRate,
       idleBalance,
       aaveBalance,
-      config.apyThresholdBps
+      config.apyThresholdBps,
+      minDeposit
     )
 
-    // 6. Skip if no action
+    // 5. Skip if no action
     if (action === ACTION_NONE) {
       console.log(`No action needed. APY: ${apyBps}bps, idle: ${idleBalance}, aave: ${aaveBalance}`)
       continue
     }
 
-    // 7. Encode report
+    // 6. Encode report
     const reportData = encodeAbiParameters(
       parseAbiParameters('uint8 action, address asset, uint256 amount, uint256 apy'),
       [action, evmCfg.assetAddress as Address, amount, BigInt(apyBps)]
     )
 
-    // 8. Generate consensus-signed report
+    // 7. Generate consensus-signed report
     const reportResponse = runtime
       .report({
         encodedPayload: hexToBase64(reportData),
@@ -294,7 +272,7 @@ async function onCronTrigger(runtime: Runtime<Config>, _payload: CronPayload): P
       })
       .result()
 
-    // 9. Write report to GhostFundVault.onReport()
+    // 8. Write report to GhostFundVault.onReport()
     const resp = evmClient
       .writeReport(runtime, {
         receiver: evmCfg.ghostFundVaultAddress as Address,

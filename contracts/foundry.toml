@@ -12,6 +12,14 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
 ]
 
+[fuzz]
+runs = 1000
+seed = '0x42'
+
+[invariant]
+runs = 256
+depth = 32
+
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
 
