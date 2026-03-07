@@ -25,6 +25,7 @@ contract MockPool is IPool {
     }
 
     function withdraw(address asset, uint256 amount, address to) external override returns (uint256) {
+        require(IERC20(asset).balanceOf(address(this)) >= amount, "MockPool: insufficient liquidity");
         IERC20(asset).transfer(to, amount);
         return amount;
     }

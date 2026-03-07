@@ -30,6 +30,17 @@ async function main() {
     }),
   })
 
+  if (!response.ok) {
+    let errorMsg = `HTTP ${response.status}`
+    try {
+      const body = await response.json()
+      errorMsg = body.error || JSON.stringify(body)
+    } catch {
+      errorMsg = await response.text().catch(() => errorMsg)
+    }
+    throw new Error(`/balances failed: ${errorMsg}`)
+  }
+
   const data = await response.json()
   console.log('Status:', response.status)
   console.log('Balances:', JSON.stringify(data, null, 2))

@@ -2,6 +2,7 @@ import 'dotenv/config'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runCommand } from './lib/shell.js'
+import { PT_VAULT_ADDRESS } from './lib/constants.js'
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(THIS_DIR, '..')
@@ -58,6 +59,17 @@ async function main() {
   requireEnv('GHOST_TOKEN_ADDRESS')
   requireEnv('BOB_PRIVATE_KEY')
 
+  // Check PT API availability before running flow
+  try {
+    const res = await fetch('https://convergence2026-token-api.cldev.cloud')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    console.log('PT API: reachable')
+  } catch {
+    console.error('ERROR: PT API at convergence2026-token-api.cldev.cloud is unreachable.')
+    console.error('The privacy demo requires the Chainlink hackathon PT infrastructure to be online.')
+    process.exit(1)
+  }
+
   console.log('1) Check private balance')
   console.log(run(BUN, ['run', 'pt-check-balance.ts']))
 
@@ -92,7 +104,7 @@ async function main() {
     'cast',
     [
       'send',
-      '0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13',
+      PT_VAULT_ADDRESS,
       'withdrawWithTicket(address,uint256,bytes)',
       token,
       amount,

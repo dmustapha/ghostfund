@@ -5,10 +5,12 @@ import { createPublicClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import { runCommand } from './lib/shell.js'
+import { PT_VAULT_ADDRESS } from './lib/constants.js'
+import { allowAbiCandidates } from './lib/abis.js'
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(THIS_DIR, '..')
-const PT_VAULT = '0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13' as `0x${string}`
+const PT_VAULT = PT_VAULT_ADDRESS as `0x${string}`
 
 function requireEnv(name: string): string {
   const v = process.env[name]
@@ -42,37 +44,6 @@ function pickRpc(): string {
   return requireEnv('SEPOLIA_RPC_URL')
 }
 
-const allowAbiCandidates = [
-  {
-    type: 'function',
-    name: 'isAllowed',
-    stateMutability: 'view',
-    inputs: [{ name: 'user', type: 'address' }],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    type: 'function',
-    name: 'addressAllowed',
-    stateMutability: 'view',
-    inputs: [{ name: 'user', type: 'address' }],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-] as const
-
-const ptVaultAbi = [
-  {
-    type: 'function',
-    name: 'checkDepositAllowed',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'depositor', type: 'address' },
-      { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-  },
-] as const
-
 async function readAllowed(client: ReturnType<typeof createPublicClient>, allow: `0x${string}`, user: `0x${string}`) {
   for (const fn of allowAbiCandidates) {
     try {
@@ -82,38 +53,88 @@ async function readAllowed(client: ReturnType<typeof createPublicClient>, allow:
         functionName: fn.name,
         args: [user],
       })) as boolean
-    } catch {
-      // try next function signature
+    } catch (e) {
+      console.log(`  (${fn.name} not supported, trying next...)`)
     }
   }
   throw new Error('No compatible allowlist read function found (tried isAllowed/addressAllowed)')
 }
 
-async function expectDepositAllowed(
+// ACE PolicyEngine.check() takes a Payload struct: (bytes4 selector, address sender, bytes data, bytes context)
+// The policy engine uses msg.sender as the target lookup key, so we must set `account` to PT_VAULT
+// to simulate the call as if the vault is invoking the policy engine.
+const policyEngineAbi = [
+  {
+    type: 'function' as const,
+    name: 'check',
+    stateMutability: 'view' as const,
+    inputs: [
+      {
+        name: 'payload',
+        type: 'tuple',
+        components: [
+          { name: 'selector', type: 'bytes4' },
+          { name: 'sender', type: 'address' },
+          { name: 'data', type: 'bytes' },
+          { name: 'context', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+] as const
+
+// checkDepositAllowed(address,address,uint256) selector
+const DEPOSIT_SELECTOR = '0x4d81d6bb'
+
+async function checkPolicyEngine(
   client: ReturnType<typeof createPublicClient>,
+  policyEngine: `0x${string}`,
   depositor: `0x${string}`,
   token: `0x${string}`,
   amount: bigint
 ) {
+  const { encodeAbiParameters, parseAbiParameters } = await import('viem')
+  const data = encodeAbiParameters(
+    parseAbiParameters('address depositor, address token, uint256 amount'),
+    [depositor, token, amount]
+  )
   await client.readContract({
-    address: PT_VAULT,
-    abi: ptVaultAbi,
-    functionName: 'checkDepositAllowed',
-    args: [depositor, token, amount],
+    address: policyEngine,
+    abi: policyEngineAbi,
+    functionName: 'check',
+    args: [{ selector: DEPOSIT_SELECTOR, sender: depositor, data, context: '0x' }],
+    account: PT_VAULT,
   })
+}
+
+async function expectDepositAllowed(
+  client: ReturnType<typeof createPublicClient>,
+  policyEngine: `0x${string}`,
+  depositor: `0x${string}`,
+  token: `0x${string}`,
+  amount: bigint
+) {
+  await checkPolicyEngine(client, policyEngine, depositor, token, amount)
 }
 
 async function expectDepositBlocked(
   client: ReturnType<typeof createPublicClient>,
+  policyEngine: `0x${string}`,
   depositor: `0x${string}`,
   token: `0x${string}`,
   amount: bigint,
   label: string
 ) {
   try {
-    await expectDepositAllowed(client, depositor, token, amount)
+    await checkPolicyEngine(client, policyEngine, depositor, token, amount)
     throw new Error(`${label} expected revert but succeeded`)
-  } catch {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('expected revert but succeeded')) throw err
+    if (msg.includes('fetch') || msg.includes('ECONNREFUSED') || msg.includes('timeout')) {
+      throw new Error(`${label}: network error (not a policy block): ${msg}`)
+    }
     console.log(`${label}: blocked as expected`)
   }
 }
@@ -122,6 +143,7 @@ async function main() {
   const rpc = pickRpc()
   const client = createPublicClient({ chain: sepolia, transport: http(rpc) })
 
+  const pe = requireEnv('POLICY_ENGINE_ADDRESS') as `0x${string}`
   const allow = requireEnv('ALLOW_POLICY_ADDRESS') as `0x${string}`
   const alice = requireEnv('ALICE_ADDRESS') as `0x${string}`
   const token = requireEnv('GHOST_TOKEN_ADDRESS') as `0x${string}`
@@ -139,9 +161,10 @@ async function main() {
   const blockedAllowed = await readAllowed(client, allow, blocked)
   console.log(JSON.stringify({ blocked, allowed: blockedAllowed }, null, 2))
 
-  console.log('3) Policy enforcement checks on PT vault')
-  await expectDepositAllowed(client, alice, token, 1n)
-  await expectDepositBlocked(client, blocked, token, 1n, 'blocked-address deposit')
+  console.log('3) Policy engine enforcement checks')
+  await expectDepositAllowed(client, pe, alice, token, 1n)
+  console.log('alice deposit: allowed as expected')
+  await expectDepositBlocked(client, pe, blocked, token, 1n, 'blocked-address deposit')
 
   console.log('4) Over-limit and pause/unpause checks')
   const maxPolicy = process.env.MAX_POLICY_ADDRESS
@@ -150,7 +173,7 @@ async function main() {
   if (!maxPolicy) {
     console.log('MAX_POLICY_ADDRESS not set; skipping over-limit check.')
   } else {
-    await expectDepositBlocked(client, alice, token, 10n ** 30n, 'over-limit deposit')
+    await expectDepositBlocked(client, pe, alice, token, 10n ** 30n, 'over-limit deposit')
   }
 
   if (!pausePolicy) {
@@ -166,7 +189,7 @@ async function main() {
         [adminKey]
       )
     )
-    await expectDepositBlocked(client, deployer, token, 1n, 'paused deposit')
+    await expectDepositBlocked(client, pe, deployer, token, 1n, 'paused deposit')
     console.log(
       run(
         'cast',
@@ -176,13 +199,15 @@ async function main() {
         [adminKey]
       )
     )
-    await expectDepositAllowed(client, deployer, token, 1n)
+    await expectDepositAllowed(client, pe, deployer, token, 1n)
+    console.log('unpaused deposit: allowed as expected')
   }
 
   console.log('Compliance flow complete')
 }
 
 main().catch((err) => {
-  console.error(err)
+  console.error('Compliance flow failed:', err instanceof Error ? err.message : err)
+  console.error('Ensure ALLOW_POLICY_ADDRESS, ALICE_ADDRESS, and GHOST_TOKEN_ADDRESS are set in .env')
   process.exit(1)
 })

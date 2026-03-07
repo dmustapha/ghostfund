@@ -1,4 +1,6 @@
-export const PT_VAULT_ADDRESS = '0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13'
+import 'dotenv/config'
+
+export const PT_VAULT_ADDRESS = process.env.PT_VAULT_ADDRESS ?? '0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13'
 export const PT_API_BASE = 'https://convergence2026-token-api.cldev.cloud'
 export const SEPOLIA_CHAIN_ID = 11155111
 

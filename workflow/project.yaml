@@ -1,6 +1,6 @@
 default: &default
   rpcs:
     - chain-name: ethereum-testnet-sepolia
-      url: https://ethereum-sepolia-rpc.publicnode.com
+      url: https://eth-sepolia.g.alchemy.com/v2/hjhJWG6Q3zbeky-ttWHnZ
 staging-settings: *default
 production-settings: *default

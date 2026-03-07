@@ -7,8 +7,9 @@ import {KeystoneFeedDefaultMetadataLib} from "@chainlink/contracts/src/v0.8/keys
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnerIsCreator} from "@chainlink/contracts/src/v0.8/shared/access/OwnerIsCreator.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract GhostFundVault is IReceiver, OwnerIsCreator {
+contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
     using KeystoneFeedDefaultMetadataLib for bytes;
     using SafeERC20 for IERC20;
 
@@ -117,7 +118,7 @@ contract GhostFundVault is IReceiver, OwnerIsCreator {
     // USER APPROVAL
     // ═══════════════════════════════════════════════════
 
-    function userApprove(uint256 recId) external onlyOwner {
+    function userApprove(uint256 recId) external onlyOwner nonReentrant {
         Recommendation storage rec = recommendations[recId];
         if (rec.action == Action.NONE) revert RecommendationNotFound();
         if (rec.executed) revert RecommendationAlreadyExecuted();
@@ -139,34 +140,35 @@ contract GhostFundVault is IReceiver, OwnerIsCreator {
     // ═══════════════════════════════════════════════════
 
     function _depositToPool(address asset, uint256 amount) internal {
-        IERC20(asset).approve(address(aavePool), amount);
+        if (IERC20(asset).balanceOf(address(this)) < amount) revert InsufficientBalance();
+        IERC20(asset).forceApprove(address(aavePool), amount);
         aavePool.supply(asset, amount, address(this), 0);
         emit Deposited(asset, amount);
     }
 
     function _withdrawFromPool(address asset, uint256 amount, address to) internal {
-        aavePool.withdraw(asset, amount, to);
-        emit Withdrawn(asset, to, amount);
+        uint256 actual = aavePool.withdraw(asset, amount, to);
+        emit Withdrawn(asset, to, actual);
     }
 
     // ═══════════════════════════════════════════════════
     // OWNER FUNCTIONS
     // ═══════════════════════════════════════════════════
 
-    function deposit(address asset, uint256 amount) external onlyOwner {
+    function deposit(address asset, uint256 amount) external onlyOwner nonReentrant {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    function withdraw(address asset, uint256 amount) external onlyOwner {
+    function withdraw(address asset, uint256 amount) external onlyOwner nonReentrant {
         IERC20(asset).safeTransfer(msg.sender, amount);
         emit Withdrawn(asset, msg.sender, amount);
     }
 
-    function depositToPool(address asset, uint256 amount) external onlyOwner {
+    function depositToPool(address asset, uint256 amount) external onlyOwner nonReentrant {
         _depositToPool(asset, amount);
     }
 
-    function withdrawFromPool(address asset, uint256 amount) external onlyOwner {
+    function withdrawFromPool(address asset, uint256 amount) external onlyOwner nonReentrant {
         _withdrawFromPool(asset, amount, msg.sender);
     }
 

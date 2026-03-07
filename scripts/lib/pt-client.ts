@@ -1,7 +1,5 @@
 import 'dotenv/config'
-import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { sepolia } from 'viem/chains'
 import { PT_DOMAIN, PT_TYPES, PT_API_BASE } from './constants.js'
 
 const privateKey = (() => {
@@ -17,12 +15,6 @@ export function accountFromPrivateKey(rawPrivateKey: string): PTSigner {
   const normalized = rawPrivateKey.startsWith('0x') ? rawPrivateKey.slice(2) : rawPrivateKey
   return privateKeyToAccount(`0x${normalized}` as `0x${string}`)
 }
-
-createWalletClient({
-  account,
-  chain: sepolia,
-  transport: http(),
-})
 
 export async function signPTRequest<T extends keyof typeof PT_TYPES>(
   primaryType: T,
@@ -61,8 +53,14 @@ export async function checkBalance(
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`/balances failed: ${error.error}`)
+    let errorMsg = `HTTP ${response.status}`
+    try {
+      const body = await response.json()
+      errorMsg = body.error || JSON.stringify(body)
+    } catch {
+      errorMsg = await response.text().catch(() => errorMsg)
+    }
+    throw new Error(`/balances failed: ${errorMsg}`)
   }
 
   return response.json()
@@ -88,8 +86,14 @@ export async function generateShieldedAddress(
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`/shielded-address failed: ${error.error}`)
+    let errorMsg = `HTTP ${response.status}`
+    try {
+      const body = await response.json()
+      errorMsg = body.error || JSON.stringify(body)
+    } catch {
+      errorMsg = await response.text().catch(() => errorMsg)
+    }
+    throw new Error(`/shielded-address failed: ${errorMsg}`)
   }
 
   return response.json()
@@ -130,8 +134,14 @@ export async function privateTransfer(
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`/private-transfer failed: ${error.error}`)
+    let errorMsg = `HTTP ${response.status}`
+    try {
+      const body = await response.json()
+      errorMsg = body.error || JSON.stringify(body)
+    } catch {
+      errorMsg = await response.text().catch(() => errorMsg)
+    }
+    throw new Error(`/private-transfer failed: ${errorMsg}`)
   }
 
   return response.json()
@@ -166,8 +176,14 @@ export async function getWithdrawTicket(
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`/withdraw failed: ${error.error}`)
+    let errorMsg = `HTTP ${response.status}`
+    try {
+      const body = await response.json()
+      errorMsg = body.error || JSON.stringify(body)
+    } catch {
+      errorMsg = await response.text().catch(() => errorMsg)
+    }
+    throw new Error(`/withdraw failed: ${errorMsg}`)
   }
 
   return response.json()
@@ -197,8 +213,14 @@ export async function listTransactions(
   })
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`/transactions failed: ${error.error}`)
+    let errorMsg = `HTTP ${response.status}`
+    try {
+      const body = await response.json()
+      errorMsg = body.error || JSON.stringify(body)
+    } catch {
+      errorMsg = await response.text().catch(() => errorMsg)
+    }
+    throw new Error(`/transactions failed: ${errorMsg}`)
   }
 
   return response.json()

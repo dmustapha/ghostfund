@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { createPublicClient, http } from 'viem'
 import { sepolia } from 'viem/chains'
 import { runCommand } from './lib/shell.js'
+import { vaultAbi } from './lib/abis.js'
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(THIS_DIR, '..')
@@ -54,40 +55,6 @@ function parseCastUint(raw: string): bigint {
   const token = raw.trim().split(/\s+/)[0]
   return BigInt(token)
 }
-
-const vaultAbi = [
-  {
-    type: 'function',
-    name: 'recommendationCount',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'recommendations',
-    stateMutability: 'view',
-    inputs: [{ name: '', type: 'uint256' }],
-    outputs: [
-      { name: 'asset', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-      { name: 'action', type: 'uint8' },
-      { name: 'apy', type: 'uint256' },
-      { name: 'timestamp', type: 'uint256' },
-      { name: 'executed', type: 'bool' },
-    ],
-  },
-  {
-    type: 'function',
-    name: 'getAavePosition',
-    stateMutability: 'view',
-    inputs: [{ name: 'asset', type: 'address' }],
-    outputs: [
-      { name: 'apy', type: 'uint256' },
-      { name: 'balance', type: 'uint256' },
-    ],
-  },
-] as const
 
 async function main() {
   const vault = requireEnv('GHOSTFUND_VAULT_ADDRESS') as `0x${string}`
@@ -218,15 +185,32 @@ async function main() {
   if (chosenId === null) {
     console.log('No pending recommendation available for userApprove; skipping approval step')
   } else {
-    console.log(
-      run(
-        'cast',
-        ['send', vault, 'userApprove(uint256)', chosenId.toString(), '--rpc-url', rpc, '--private-key', pk],
-        ROOT,
-        {},
-        [pk]
+    // Check if recommendation has expired (1 hour TTL)
+    const rec = (await client.readContract({
+      address: vault,
+      abi: vaultAbi,
+      functionName: 'recommendations',
+      args: [chosenId],
+    })) as readonly [`0x${string}`, bigint, number, bigint, bigint, boolean]
+    const recTimestamp = Number(rec[4])
+    const now = Math.floor(Date.now() / 1000)
+    const expiresIn = (recTimestamp + 3600) - now
+
+    if (expiresIn <= 0) {
+      console.log(`Recommendation ${chosenId} expired ${Math.abs(expiresIn)}s ago. Skipping approval.`)
+      console.log('Re-run CRE simulation to generate a fresh recommendation.')
+    } else {
+      console.log(`Recommendation expires in ${expiresIn}s — approving now`)
+      console.log(
+        run(
+          'cast',
+          ['send', vault, 'userApprove(uint256)', chosenId.toString(), '--rpc-url', rpc, '--private-key', pk],
+          ROOT,
+          {},
+          [pk]
+        )
       )
-    )
+    }
   }
 
   console.log('5) Verify Aave position')
