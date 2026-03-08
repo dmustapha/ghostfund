@@ -1,4 +1,4 @@
-# GhostFund V2 — Test Runner
+# GhostFund — Test Runner
 # Usage: make [target]  (default: test)
 
 -include .env

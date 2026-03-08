@@ -2,7 +2,7 @@
   <img src="assets/ghostfund-logo.jpg" alt="GhostFund" width="200">
 </p>
 
-# GhostFund V2: Private DeFi Yield with Human-Gated Automation
+# GhostFund: Private DeFi Yield with Human-Gated Automation
 
 Compliant private yield vault that automates Aave V3 strategy monitoring, moves funds with sender privacy, and enforces deposit compliance at the smart contract level.
 
@@ -24,7 +24,7 @@ Connect MetaMask on Sepolia to view live vault data, approve CRE recommendations
 
 ## What Is GhostFund?
 
-GhostFund V2 is a DeFi vault on Sepolia that combines three Chainlink primitives into one system. CRE (Compute Runtime Environment) monitors Aave V3 yields and recommends actions. Private Transactions hide the sender when distributing funds. ACE (Access Control Engine) enforces allowlists, deposit caps, and emergency pauses on every deposit.
+GhostFund is a DeFi vault on Sepolia that combines three Chainlink primitives into one system. CRE (Compute Runtime Environment) monitors Aave V3 yields and recommends actions. Private Transactions hide the sender when distributing funds. ACE (Access Control Engine) enforces allowlists, deposit caps, and emergency pauses on every deposit.
 
 No funds move without the vault owner's explicit approval. Every recommendation expires after 1 hour if not approved.
 
@@ -214,8 +214,8 @@ All contracts deployed on Ethereum Sepolia testnet.
 ### Setup
 
 ```bash
-git clone https://github.com/dmustapha/ghostfund-v2.git
-cd ghostfund-v2
+git clone https://github.com/dmustapha/ghostfund.git
+cd ghostfund
 
 cp .env.example .env
 # Set PRIVATE_KEY and SEPOLIA_RPC_URL
@@ -265,7 +265,7 @@ Serve over `http://` (not `file://`) for MetaMask wallet injection.
 ## Project Structure
 
 ```
-ghostfund-v2/
+ghostfund/
   contracts/
     src/
       GhostFundVault.sol          Core vault: Aave integration + approval pattern
