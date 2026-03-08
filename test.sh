@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GhostFund V2 — Test Runner
+# GhostFund — Test Runner
 # Usage: ./test.sh [--all|--coverage|--gas|--sol|--ts|--fork]
 
 set -euo pipefail
