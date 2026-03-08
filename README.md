@@ -16,7 +16,7 @@ Compliant private yield vault that automates Aave V3 strategy monitoring, moves 
 
 ## Live Demo
 
-**[https://frontend-fh4efi8rt-damilolas-projects-fafdf859.vercel.app](https://frontend-fh4efi8rt-damilolas-projects-fafdf859.vercel.app)**
+**[https://ghostfund.vercel.app](https://ghostfund.vercel.app)**
 
 Connect MetaMask on Sepolia to view live vault data, approve CRE recommendations, and interact with the vault.
 
