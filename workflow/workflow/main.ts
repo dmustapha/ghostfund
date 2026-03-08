@@ -29,7 +29,6 @@ const configSchema = z.object({
   schedule: z.string(),
   apyThresholdBps: z.number(), // Minimum APY in basis points to recommend deposit
   minDepositAmount: z.string().optional(), // Minimum deposit to avoid dust (wei string, default 0)
-  priceApiUrl: z.string(),
   evms: z.array(
     z.object({
       assetAddress: z.string(),
@@ -208,6 +207,7 @@ function decideStrategy(
 async function onCronTrigger(runtime: Runtime<Config>, _payload: CronPayload): Promise<string> {
   const config = configSchema.parse(runtime.config)
 
+  // Config supports multiple EVM chains. Currently Sepolia-only for hackathon demo.
   for (const evmCfg of config.evms) {
     const network = getNetwork({
       chainFamily: 'evm',
@@ -284,6 +284,24 @@ async function onCronTrigger(runtime: Runtime<Config>, _payload: CronPayload): P
     if (resp.txStatus !== TxStatus.SUCCESS) {
       throw new Error(`writeReport failed: ${resp.errorMessage}`)
     }
+
+    // Verify recommendation was stored
+    const countCallData = encodeFunctionData({
+      abi: [{ name: 'recommendationCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] }],
+      functionName: 'recommendationCount',
+    })
+    const countResult = evmClient
+      .callContract(runtime, {
+        call: encodeCallMsg({ from: zeroAddress, to: evmCfg.ghostFundVaultAddress as Address, data: countCallData }),
+        blockNumber: LATEST_BLOCK_NUMBER,
+      })
+      .result()
+    const newCount = decodeFunctionResult({
+      abi: [{ name: 'recommendationCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] }],
+      functionName: 'recommendationCount',
+      data: bytesToHex(countResult.data),
+    })
+    console.log(`Verified: recommendationCount=${newCount}`)
 
     console.log(`Report written: action=${action}, amount=${amount}, apy=${apyBps}bps`)
   }

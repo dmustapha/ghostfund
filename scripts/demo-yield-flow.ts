@@ -129,25 +129,30 @@ async function main() {
   )
 
   console.log('3) Trigger CRE workflow broadcast simulation (writes recommendation)')
-  console.log(
-    run(
-      CRE_BIN,
-      [
-        'workflow',
-        'simulate',
-        './workflow',
-        '--target',
-        'staging-settings',
-        '--non-interactive',
-        '--trigger-index',
-        '0',
-        '--broadcast',
-      ],
-      WORKFLOW,
-      { CRE_ETH_PRIVATE_KEY: pk, PATH: `${path.dirname(BUN_BIN)}:${process.env.PATH ?? ''}` },
-      [pk]
+  if (!fs.existsSync(CRE_BIN)) {
+    console.log('CRE CLI not found at', CRE_BIN, '— skipping CRE simulation step.')
+    console.log('Install CRE CLI or set CRE_BIN env var. Continuing with existing recommendations.')
+  } else {
+    console.log(
+      run(
+        CRE_BIN,
+        [
+          'workflow',
+          'simulate',
+          './workflow',
+          '--target',
+          'staging-settings',
+          '--non-interactive',
+          '--trigger-index',
+          '0',
+          '--broadcast',
+        ],
+        WORKFLOW,
+        { CRE_ETH_PRIVATE_KEY: pk, PATH: `${path.dirname(BUN_BIN)}:${process.env.PATH ?? ''}` },
+        [pk]
+      )
     )
-  )
+  }
 
   const client = createPublicClient({ chain: sepolia, transport: http(rpc) })
 
@@ -174,8 +179,8 @@ async function main() {
       abi: vaultAbi,
       functionName: 'recommendations',
       args: [i],
-    })) as readonly [`0x${string}`, bigint, number, bigint, bigint, boolean]
-    if (!rec[5]) {
+    })) as readonly [`0x${string}`, number, boolean, bigint, bigint, bigint]
+    if (!rec[2]) {
       chosenId = i
       break
     }
@@ -191,8 +196,8 @@ async function main() {
       abi: vaultAbi,
       functionName: 'recommendations',
       args: [chosenId],
-    })) as readonly [`0x${string}`, bigint, number, bigint, bigint, boolean]
-    const recTimestamp = Number(rec[4])
+    })) as readonly [`0x${string}`, number, boolean, bigint, bigint, bigint]
+    const recTimestamp = Number(rec[5])
     const now = Math.floor(Date.now() / 1000)
     const expiresIn = (recTimestamp + 3600) - now
 

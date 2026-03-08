@@ -20,7 +20,7 @@ async function main() {
   // Withdraw ticket for Bob (recipient side)
   const bob = signerFromEnv('BOB_PRIVATE_KEY')
   const data = await getWithdrawTicket(bob.address, token, amount, bob)
-  console.log('WithdrawTicket:', JSON.stringify(data, null, 2))
+  console.log('WithdrawTicket:', JSON.stringify({ ...data, amount }))
 }
 
 main().catch((e) => {

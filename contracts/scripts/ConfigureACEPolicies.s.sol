@@ -21,10 +21,7 @@ contract ConfigureACEPolicies is Script {
         address allowPolicyAddress = vm.envAddress("ALLOW_POLICY_ADDRESS");
         address maxPolicyAddress = vm.envAddress("MAX_POLICY_ADDRESS");
         address pausePolicyAddress = vm.envAddress("PAUSE_POLICY_ADDRESS");
-        address target = vm.envOr(
-            "PT_VAULT_ADDRESS",
-            address(0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13)
-        );
+        address target = vm.envAddress("PT_VAULT_ADDRESS");
 
         uint256 maxDepositAmount = vm.envOr("MAX_DEPOSIT_AMOUNT", uint256(1_000_000 ether));
 

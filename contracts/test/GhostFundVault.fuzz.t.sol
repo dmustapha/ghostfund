@@ -49,6 +49,8 @@ contract GhostFundVaultFuzzTest is Test {
     }
 
     function testFuzz_onReport_anyAmount(uint256 amount) public {
+        amount = bound(amount, 1, type(uint256).max);
+
         bytes memory metadata = _buildMetadata(workflowOwner);
         bytes memory report = abi.encode(uint8(1), address(token), amount, uint256(500));
 
@@ -127,6 +129,17 @@ contract GhostFundVaultFuzzTest is Test {
             vault.userApprove(0);
             assertTrue(vault.getRecommendation(0).executed);
         }
+    }
+
+    function testFuzz_onReport_revertsOnInvalidAction(uint8 action) public {
+        vm.assume(action == 0 || action > 2);
+
+        bytes memory metadata = _buildMetadata(workflowOwner);
+        bytes memory report = abi.encode(action, address(token), uint256(1000), uint256(500));
+
+        vm.prank(forwarder);
+        vm.expectRevert(abi.encodeWithSelector(GhostFundVault.InvalidAction.selector, action));
+        vault.onReport(metadata, report);
     }
 
     function testFuzz_multipleRecommendations(uint8 count) public {

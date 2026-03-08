@@ -6,7 +6,7 @@ async function main() {
   if (!raw) throw new Error('Missing BOB_PRIVATE_KEY/PRIVATE_KEY')
   const signer = accountFromPrivateKey(raw)
   const data = await generateShieldedAddress(signer.address, signer)
-  console.log('Shielded:', JSON.stringify(data, null, 2))
+  console.log('ShieldedAddress:', JSON.stringify(data))
 }
 
 main().catch((e) => {

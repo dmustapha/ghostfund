@@ -30,17 +30,3 @@ export const allowAbiCandidates = [
     outputs: [{ name: '', type: 'bool' }],
   },
 ] as const
-
-export const ptVaultAbi = [
-  {
-    type: 'function' as const,
-    name: 'checkDepositAllowed',
-    stateMutability: 'view' as const,
-    inputs: [
-      { name: 'depositor', type: 'address' },
-      { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-  },
-] as const

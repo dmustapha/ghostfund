@@ -14,6 +14,7 @@ contract VaultHandler is Test {
     address public owner;
 
     uint256 public forwarderReportCount;
+    mapping(uint256 => bool) public executedIds;
 
     constructor(GhostFundVault _vault, GhostToken _token, address _forwarder, address _workflowOwner, address _owner) {
         vault = _vault;
@@ -80,6 +81,7 @@ contract VaultHandler is Test {
 
         vm.prank(owner);
         vault.userApprove(recId);
+        executedIds[recId] = true;
     }
 }
 
@@ -125,11 +127,9 @@ contract GhostFundVaultInvariantTest is Test {
     function invariant_executedRecommendationsStayExecuted() public view {
         uint256 count = vault.recommendationCount();
         for (uint256 i = 0; i < count; i++) {
-            GhostFundVault.Recommendation memory rec = vault.getRecommendation(i);
-            if (rec.executed) {
-                // Re-read to verify it's still true (storage consistency)
-                GhostFundVault.Recommendation memory rec2 = vault.getRecommendation(i);
-                assertTrue(rec2.executed, "Executed recommendation must stay executed");
+            if (handler.executedIds(i)) {
+                GhostFundVault.Recommendation memory rec = vault.getRecommendation(i);
+                assertTrue(rec.executed, "Handler-tracked executed rec must stay executed on-chain");
             }
         }
     }
@@ -139,9 +139,4 @@ contract GhostFundVaultInvariantTest is Test {
         assertEq(vault.recommendationCount(), handler.forwarderReportCount(), "Count must equal reports created");
     }
 
-    function invariant_noUnauthorizedRecommendations() public view {
-        // All recommendations must have been created through the forwarder
-        // (tracked by handler's forwarderReportCount matching vault's count)
-        assertEq(vault.recommendationCount(), handler.forwarderReportCount());
-    }
 }

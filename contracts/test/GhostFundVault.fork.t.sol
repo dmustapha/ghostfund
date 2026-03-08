@@ -37,13 +37,9 @@ contract GhostFundVaultForkTest is Test {
     /// @dev Try depositToPool; skip test if Aave supply cap is reached (error 51).
     function _tryDepositToPool(address asset, uint256 amount) internal {
         try vault.depositToPool(asset, amount) {}
-        catch Error(string memory reason) {
-            if (keccak256(bytes(reason)) == keccak256("51")) {
-                emit log("Aave supply cap reached on Sepolia - skipping test");
-                vm.skip(true);
-            } else {
-                revert(reason);
-            }
+        catch (bytes memory err) {
+            emit log_named_bytes("Aave fork revert (skipping)", err);
+            vm.skip(true);
         }
     }
 

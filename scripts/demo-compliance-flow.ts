@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, toFunctionSelector } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import { runCommand } from './lib/shell.js'
@@ -84,8 +84,7 @@ const policyEngineAbi = [
   },
 ] as const
 
-// checkDepositAllowed(address,address,uint256) selector
-const DEPOSIT_SELECTOR = '0x4d81d6bb'
+const DEPOSIT_SELECTOR = toFunctionSelector('checkDepositAllowed(address,address,uint256)')
 
 async function checkPolicyEngine(
   client: ReturnType<typeof createPublicClient>,
