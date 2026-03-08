@@ -1,0 +1,5 @@
+node_modules/
+out/
+dist/
+# Exclude preview screenshots at root but keep public/ assets
+/preview-*.png
