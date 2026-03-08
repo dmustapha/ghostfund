@@ -20,6 +20,10 @@ Compliant private yield vault that automates Aave V3 strategy monitoring, moves 
 
 Connect MetaMask on Sepolia to view live vault data, approve CRE recommendations, and interact with the vault.
 
+## Demo Video
+
+**[https://youtu.be/_UiGqtLKlWI](https://youtu.be/_UiGqtLKlWI)**
+
 ---
 
 ## What Is GhostFund?
