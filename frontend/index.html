@@ -1,0 +1,2026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GhostFund V2 — Private Yield Vault</title>
+  <link rel="icon" type="image/jpeg" href="favicon.jpg">
+  <meta name="description" content="Compliant private DeFi yield vault built on Chainlink CRE, Private Transactions, and ACE. Live dashboard on Sepolia.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0a1a;
+      --bg-secondary: rgba(15, 15, 30, 0.9);
+      --bg-card: rgba(22, 22, 42, 0.8);
+      --bg-tertiary: rgba(30, 30, 55, 0.6);
+
+      --border-default: rgba(255, 255, 255, 0.1);
+      --border-glow: rgba(99, 102, 241, 0.3);
+      --text-primary: #f8f8ff;
+      --text-secondary: #b0b3c8;
+      --text-muted: #7e82a0;
+      --accent: #818cf8;
+      --accent-bright: #a5b4fc;
+      --accent-dim: #4f46e5;
+      --cyan: #22d3ee;
+      --green: #34d399;
+      --green-dim: rgba(52, 211, 153, 0.12);
+      --red: #f87171;
+      --red-dim: rgba(248, 113, 113, 0.12);
+      --yellow: #fbbf24;
+      --yellow-dim: rgba(251, 191, 36, 0.12);
+      --glass-bg: rgba(255, 255, 255, 0.045);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      --shadow-glow: 0 0 60px rgba(99, 102, 241, 0.12);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+      --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Animated Mesh Background ── */
+    .mesh-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .mesh-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(110px);
+      opacity: 0.5;
+      animation: meshFloat 20s ease-in-out infinite;
+    }
+    .mesh-blob:nth-child(1) {
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(79, 70, 229, 0.6), transparent 70%);
+      top: -15%; left: -8%;
+      animation-delay: 0s;
+    }
+    .mesh-blob:nth-child(2) {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.4), transparent 70%);
+      top: 40%; right: -12%;
+      animation-delay: -7s;
+      animation-duration: 25s;
+    }
+    .mesh-blob:nth-child(3) {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.35), transparent 70%);
+      bottom: -8%; left: 25%;
+      animation-delay: -14s;
+      animation-duration: 22s;
+    }
+    @keyframes meshFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(30px, -40px) scale(1.05); }
+      50% { transform: translate(-20px, 20px) scale(0.95); }
+      75% { transform: translate(40px, 30px) scale(1.02); }
+    }
+
+    /* ── Noise Overlay ── */
+    .noise {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 128px;
+    }
+
+    /* ── Main Layout ── */
+    .app {
+      position: relative;
+      z-index: 2;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 2rem 2rem 3rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid transparent;
+      border-image: linear-gradient(90deg, transparent, var(--border-default), rgba(129, 140, 248, 0.15), var(--border-default), transparent) 1;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo-mark {
+      width: 52px; height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--accent-dim), var(--accent), var(--cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.4), 0 0 60px rgba(99, 102, 241, 0.15);
+      animation: logoPulse 4s ease-in-out infinite;
+      position: relative;
+    }
+    .logo-mark svg { width: 30px; height: 30px; filter: drop-shadow(0 0 6px rgba(255,255,255,0.4)); }
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 0 30px rgba(99, 102, 241, 0.4), 0 0 60px rgba(99, 102, 241, 0.15); }
+      50% { box-shadow: 0 0 50px rgba(99, 102, 241, 0.55), 0 0 100px rgba(99, 102, 241, 0.25); }
+    }
+    .header-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 10%, var(--accent-bright) 50%, var(--cyan) 90%);
+      background-size: 200% 200%;
+      animation: titleShimmer 6s ease-in-out infinite;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    @keyframes titleShimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .header-sub {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-top: 0.2rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    /* ── Wallet Button ── */
+    .btn-wallet {
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.5rem 1.2rem;
+      border-radius: 999px;
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(129, 140, 248, 0.1));
+      color: var(--accent-bright);
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+    }
+    .btn-wallet:hover {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.3), rgba(129, 140, 248, 0.2));
+      border-color: var(--accent);
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+      transform: translateY(-1px);
+    }
+    .btn-wallet.connected {
+      background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08));
+      border-color: rgba(52, 211, 153, 0.3);
+      color: var(--green);
+      box-shadow: 0 0 20px rgba(52, 211, 153, 0.1);
+    }
+
+    /* ── Action Buttons ── */
+    .btn-approve {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.35rem 0.85rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      background: var(--green-dim);
+      color: var(--green);
+      cursor: pointer;
+      transition: all 0.2s var(--ease-out);
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.08);
+    }
+    .btn-approve:hover {
+      background: rgba(52, 211, 153, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 0 20px rgba(52, 211, 153, 0.15);
+    }
+    .btn-approve:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-approve.pending {
+      background: var(--yellow-dim);
+      border-color: rgba(251, 191, 36, 0.2);
+      color: var(--yellow);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 500;
+      z-index: 100;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.3s var(--ease-out), opacity 0.3s;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast-success { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.2); color: var(--green); }
+    .toast-error { background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.2); color: var(--red); }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--green);
+      background: rgba(52, 211, 153, 0.08);
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid rgba(52, 211, 153, 0.2);
+      box-shadow: 0 0 20px rgba(52, 211, 153, 0.08);
+      font-family: var(--font-mono);
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: livePulse 2s ease-in-out infinite;
+      box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(52, 211, 153, 0.6); }
+      50% { opacity: 0.5; box-shadow: 0 0 16px rgba(52, 211, 153, 0.2); }
+    }
+    .chain-badge {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--glass-bg);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--glass-border);
+      font-family: var(--font-mono);
+    }
+
+    /* ── Stats Banner ── */
+    .stats-banner {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius);
+      padding: 1.4rem 1.6rem;
+      transition: border-color 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--stat-glow, var(--accent)), transparent);
+      opacity: 0.7;
+      transition: opacity 0.3s;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at top, var(--stat-glow-bg, rgba(129, 140, 248, 0.04)), transparent 70%);
+      pointer-events: none;
+    }
+    .stat-card:hover {
+      border-color: var(--stat-glow, var(--border-glow));
+      box-shadow: 0 0 60px var(--stat-glow-shadow, rgba(99, 102, 241, 0.12));
+      transform: translateY(-4px);
+    }
+    .stat-card:hover::before { opacity: 1; }
+    .stat-card:nth-child(1) { --stat-glow: var(--accent); --stat-glow-bg: rgba(129, 140, 248, 0.05); --stat-glow-shadow: rgba(129, 140, 248, 0.15); }
+    .stat-card:nth-child(2) { --stat-glow: var(--cyan); --stat-glow-bg: rgba(34, 211, 238, 0.05); --stat-glow-shadow: rgba(34, 211, 238, 0.15); }
+    .stat-card:nth-child(3) { --stat-glow: var(--green); --stat-glow-bg: rgba(52, 211, 153, 0.05); --stat-glow-shadow: rgba(52, 211, 153, 0.15); }
+    .stat-card:nth-child(4) { --stat-glow: #a78bfa; --stat-glow-bg: rgba(167, 139, 250, 0.05); --stat-glow-shadow: rgba(167, 139, 250, 0.15); }
+    .stat-card-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+    .stat-card-value {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      transition: opacity 0.3s, transform 0.3s var(--ease-out);
+    }
+    .stat-card-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.45rem;
+      font-family: var(--font-mono);
+    }
+    .stat-accent { color: var(--accent-bright); text-shadow: 0 0 30px rgba(165, 180, 252, 0.3); }
+    .stat-green { color: var(--green); text-shadow: 0 0 30px rgba(52, 211, 153, 0.3); }
+    .stat-cyan { color: var(--cyan); text-shadow: 0 0 30px rgba(34, 211, 238, 0.3); }
+
+    /* ── Card Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 1rem;
+    }
+    .col-8 { grid-column: span 8; }
+    .col-6 { grid-column: span 6; }
+    .col-4 { grid-column: span 4; }
+    .col-12 { grid-column: span 12; }
+
+    /* ── Activity Feed ── */
+    .activity-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.75rem;
+      margin: 0 -0.75rem;
+      border-radius: var(--radius-xs);
+      transition: background 0.2s;
+    }
+    .activity-item:hover { background: rgba(255, 255, 255, 0.02); }
+    .activity-item + .activity-item { border-top: 1px solid rgba(255, 255, 255, 0.03); }
+    .activity-left { display: flex; align-items: center; gap: 0.75rem; }
+    .activity-icon {
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .activity-icon.deposit { background: var(--green-dim); color: var(--green); }
+    .activity-icon.withdraw { background: var(--red-dim); color: var(--red); }
+    .activity-icon.supply { background: rgba(34, 211, 238, 0.12); color: var(--cyan); }
+    .activity-icon.recommend { background: rgba(129, 140, 248, 0.12); color: var(--accent-bright); }
+    .activity-icon.other { background: var(--glass-bg); color: var(--text-muted); }
+    .activity-desc { font-size: 0.82rem; color: var(--text-secondary); }
+    .activity-sub { font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono); }
+    .activity-right { text-align: right; }
+    .activity-time { font-size: 0.7rem; color: var(--text-muted); }
+    .activity-hash {
+      font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);
+      text-decoration: none; transition: color 0.2s;
+    }
+    .activity-hash:hover { color: var(--accent-bright); }
+
+    /* ── Glass Card ── */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.3s var(--ease-out), border-color 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 5%, rgba(129, 140, 248, 0.4) 30%, rgba(34, 211, 238, 0.3) 70%, transparent 95%);
+      opacity: 0.6;
+    }
+    .card::after {
+      content: '';
+      position: absolute;
+      top: -1px; left: -1px; right: -1px; bottom: -1px;
+      border-radius: inherit;
+      background: linear-gradient(135deg, transparent 40%, rgba(129, 140, 248, 0.08) 50%, transparent 60%);
+      background-size: 300% 300%;
+      animation: cardSheen 8s ease-in-out infinite;
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .card:hover::after { opacity: 1; }
+    @keyframes cardSheen {
+      0%, 100% { background-position: 0% 0%; }
+      50% { background-position: 100% 100%; }
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-glow);
+      box-shadow: var(--shadow-card), var(--shadow-glow);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+    .card-icon {
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      background: linear-gradient(135deg, rgba(129, 140, 248, 0.08), rgba(34, 211, 238, 0.06));
+      border: 1px solid rgba(129, 140, 248, 0.15);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.06);
+    }
+
+    /* ── Data Rows ── */
+    .data-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .data-row:last-child { border-bottom: none; }
+    .data-label {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+    .data-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .data-addr {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-xs);
+      transition: background 0.2s, color 0.2s;
+    }
+    .data-addr:hover {
+      background: var(--glass-bg);
+      color: var(--text-secondary);
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .badge-green { background: rgba(52, 211, 153, 0.15); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.2); box-shadow: 0 0 12px rgba(52, 211, 153, 0.08); }
+    .badge-red { background: rgba(248, 113, 113, 0.15); color: var(--red); border: 1px solid rgba(248, 113, 113, 0.2); box-shadow: 0 0 12px rgba(248, 113, 113, 0.08); }
+    .badge-yellow { background: rgba(251, 191, 36, 0.15); color: var(--yellow); border: 1px solid rgba(251, 191, 36, 0.2); box-shadow: 0 0 12px rgba(251, 191, 36, 0.08); }
+    .badge-accent {
+      background: rgba(129, 140, 248, 0.1);
+      color: var(--accent-bright);
+      border: 1px solid rgba(129, 140, 248, 0.12);
+    }
+
+    /* ── Recommendation Items ── */
+    .rec-item {
+      padding: 0.85rem 1rem;
+      margin: 0 -1rem;
+      border-radius: var(--radius-sm);
+      transition: background 0.2s;
+    }
+    .rec-item:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .rec-item + .rec-item {
+      border-top: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .rec-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .rec-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .rec-id {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .rec-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+      font-family: var(--font-mono);
+    }
+
+    /* ── Contract Row ── */
+    .contract-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.75rem;
+      margin: 0 -0.75rem;
+      border-radius: var(--radius-xs);
+      transition: background 0.2s;
+    }
+    .contract-row:hover { background: rgba(255, 255, 255, 0.02); }
+    .contract-row + .contract-row { border-top: 1px solid rgba(255, 255, 255, 0.03); }
+    .contract-name {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .contract-addr {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .contract-addr:hover { color: var(--accent-bright); }
+
+    /* ── Policy Item ── */
+    .policy-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.7rem 0;
+    }
+    .policy-item + .policy-item { border-top: 1px solid rgba(255, 255, 255, 0.03); }
+    .policy-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .policy-name { font-size: 0.85rem; font-weight: 500; }
+    .policy-desc { font-size: 0.7rem; color: var(--text-muted); }
+
+    /* ── Architecture Diagram ── */
+    .arch-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 1rem 0;
+      flex-wrap: wrap;
+    }
+    .arch-node {
+      padding: 0.55rem 1.1rem;
+      border-radius: var(--radius-xs);
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      white-space: nowrap;
+      transition: all 0.3s var(--ease-out);
+      position: relative;
+    }
+    .arch-node:hover {
+      border-color: rgba(129, 140, 248, 0.3);
+      background: rgba(129, 140, 248, 0.08);
+      transform: translateY(-2px);
+    }
+    .arch-node.active {
+      background: rgba(129, 140, 248, 0.12);
+      border-color: rgba(129, 140, 248, 0.35);
+      color: var(--accent-bright);
+      box-shadow: 0 0 25px rgba(99, 102, 241, 0.15), inset 0 0 15px rgba(99, 102, 241, 0.05);
+    }
+    .arch-arrow {
+      color: var(--accent);
+      font-size: 0.9rem;
+      opacity: 0.4;
+      animation: arrowPulse 2s ease-in-out infinite;
+    }
+    .arch-arrow:nth-child(4n+1) { animation-delay: 0s; }
+    .arch-arrow:nth-child(4n+3) { animation-delay: 0.3s; }
+    .arch-arrow:nth-child(4n+5) { animation-delay: 0.6s; }
+    .arch-arrow:nth-child(4n+7) { animation-delay: 0.9s; }
+    @keyframes arrowPulse {
+      0%, 100% { opacity: 0.3; color: var(--accent); }
+      50% { opacity: 0.8; color: var(--cyan); }
+    }
+
+    /* ── Skeleton Loading ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--bg-tertiary) 25%, rgba(255,255,255,0.04) 50%, var(--bg-tertiary) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      color: transparent;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skeleton-line { height: 1rem; width: 60%; margin: 0.4rem 0; }
+    .skeleton-value { height: 1.65rem; width: 40%; }
+
+    /* ── Footer ── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-default);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .footer-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer a:hover { color: var(--accent-bright); }
+    .tech-badges {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .tech-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+    .tech-badge .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .stats-banner { grid-template-columns: repeat(2, 1fr); }
+      .col-8, .col-6, .col-4 { grid-column: span 6; }
+    }
+    @media (max-width: 700px) {
+      .app { padding: 1rem 1rem 2rem; }
+      .header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+      .header-right { width: 100%; }
+      .stats-banner { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+      .stat-card { padding: 1rem; }
+      .stat-card-value { font-size: 1.3rem; }
+      .grid { grid-template-columns: 1fr; }
+      .col-8, .col-6, .col-4 { grid-column: span 1; }
+      .arch-flow { gap: 0.25rem; }
+    }
+    @media (max-width: 400px) {
+      .stats-banner { grid-template-columns: 1fr; }
+    }
+
+    /* ── Entrance Animations ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(16px);
+      animation: fadeUp 0.6s var(--ease-out) forwards;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; }
+    .delay-6 { animation-delay: 0.6s; }
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Grid Line Overlay ── */
+    .grid-lines {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(129, 140, 248, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(129, 140, 248, 0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent);
+    }
+
+    /* ── Scanning Line ── */
+    .scan-line {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .scan-line::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 10%, rgba(129, 140, 248, 0.15) 40%, rgba(34, 211, 238, 0.2) 60%, transparent 90%);
+      box-shadow: 0 0 20px 4px rgba(129, 140, 248, 0.06);
+      animation: scanDown 12s linear infinite;
+    }
+    @keyframes scanDown {
+      0% { top: -2%; }
+      100% { top: 102%; }
+    }
+
+    /* ── Reduced Motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      .mesh-blob { animation: none; }
+      .live-dot { animation: none; }
+      .skeleton { animation: none; }
+      .card { transition: none; }
+      .stat-card { transition: none; }
+      .stat-card::before { transition: none; }
+      .logo-mark { animation: none; }
+      .fade-in { animation: none; opacity: 1; transform: none; }
+      .arch-arrow { animation: none; opacity: 0.5; }
+      .scan-line::after { animation: none; display: none; }
+      .header-title { animation: none; }
+      .card::after { animation: none; }
+    }
+
+    /* ── Operations Panel ── */
+    .ops-panel {
+      margin-bottom: 1.5rem;
+    }
+    .ops-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 1px solid var(--border-default);
+    }
+    .ops-tab {
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.6rem 1.25rem;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+    .ops-tab:hover { color: var(--text-secondary); }
+    .ops-tab.active {
+      color: var(--accent-bright);
+    }
+    .ops-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+    }
+    .ops-body {
+      display: none;
+      padding: 1.25rem 0 0;
+    }
+    .ops-body.active { display: block; }
+    .ops-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .ops-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .ops-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    .ops-select, .ops-input {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--border-default);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .ops-select:focus, .ops-input:focus {
+      border-color: var(--accent);
+    }
+    .ops-input-wrap {
+      position: relative;
+      display: flex;
+    }
+    .ops-input-wrap .ops-input {
+      flex: 1;
+      padding-right: 3.5rem;
+    }
+    .ops-max-btn {
+      position: absolute;
+      right: 0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      border: 1px solid rgba(129, 140, 248, 0.2);
+      background: rgba(129, 140, 248, 0.08);
+      color: var(--accent-bright);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .ops-max-btn:hover { background: rgba(129, 140, 248, 0.15); }
+    .ops-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .ops-btn {
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.55rem 1.25rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, opacity 0.2s;
+    }
+    .ops-btn:hover { transform: translateY(-1px); }
+    .ops-btn:active { transform: translateY(0); }
+    .ops-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .ops-btn-deposit {
+      background: var(--green-dim);
+      border-color: rgba(52, 211, 153, 0.2);
+      color: var(--green);
+    }
+    .ops-btn-deposit:hover:not(:disabled) { background: rgba(52, 211, 153, 0.2); }
+    .ops-btn-withdraw {
+      background: var(--red-dim);
+      border-color: rgba(248, 113, 113, 0.2);
+      color: var(--red);
+    }
+    .ops-btn-withdraw:hover:not(:disabled) { background: rgba(248, 113, 113, 0.2); }
+    .ops-btn-supply {
+      background: rgba(34, 211, 238, 0.1);
+      border-color: rgba(34, 211, 238, 0.2);
+      color: var(--cyan);
+    }
+    .ops-btn-supply:hover:not(:disabled) { background: rgba(34, 211, 238, 0.18); }
+    .ops-balances {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
+    .ops-bal-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--radius-xs);
+      padding: 0.6rem 0.8rem;
+    }
+    .ops-bal-label {
+      font-size: 0.65rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.2rem;
+    }
+    .ops-bal-value {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .ops-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .ops-status.pending { color: var(--yellow); }
+    .ops-status.success { color: var(--green); }
+    .ops-status.error { color: var(--red); }
+    .ops-owner-gate {
+      text-align: center;
+      padding: 1.5rem 0;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+    .ops-owner-gate .badge { font-size: 0.72rem; }
+    @media (max-width: 700px) {
+      .ops-form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated mesh gradient background -->
+  <div class="mesh-bg">
+    <div class="mesh-blob"></div>
+    <div class="mesh-blob"></div>
+    <div class="mesh-blob"></div>
+  </div>
+  <div class="noise"></div>
+  <div class="grid-lines"></div>
+  <div class="scan-line"></div>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header fade-in" role="banner">
+      <div class="header-left">
+        <div class="logo-mark"><img src="favicon.jpg" alt="GhostFund" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>
+        <div>
+          <div class="header-title">GhostFund V2</div>
+          <div class="header-sub">Compliant Private DeFi Yield Vault</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button type="button" class="btn-wallet" id="btn-wallet" onclick="connectWallet()">Connect Wallet</button>
+        <div class="live-indicator">
+          <span class="live-dot"></span>
+          <span id="block-display">Sepolia</span>
+        </div>
+        <div class="chain-badge">Chain 11155111</div>
+      </div>
+    </header>
+    <div class="toast" id="toast" aria-live="polite" role="status"></div>
+
+    <!-- Architecture Flow -->
+    <div class="arch-flow fade-in delay-1">
+      <span class="arch-node active">CRE Workflow</span>
+      <span class="arch-arrow">&#10132;</span>
+      <span class="arch-node active">GhostFund Vault</span>
+      <span class="arch-arrow">&#10132;</span>
+      <span class="arch-node active">Aave V3</span>
+      <span class="arch-arrow">&#10132;</span>
+      <span class="arch-node active">Private Tx</span>
+      <span class="arch-arrow">&#10132;</span>
+      <span class="arch-node active">ACE Policy</span>
+    </div>
+
+    <main>
+    <!-- Stats Banner -->
+    <div class="stats-banner fade-in delay-2">
+      <div class="stat-card">
+        <div class="stat-card-label">GhostToken Balance</div>
+        <div class="stat-card-value stat-accent" id="stat-ghost-bal"><span class="skeleton skeleton-value">&nbsp;</span></div>
+        <div class="stat-card-sub" id="stat-ghost-sub">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Aave Supplied</div>
+        <div class="stat-card-value stat-cyan" id="stat-aave-bal"><span class="skeleton skeleton-value">&nbsp;</span></div>
+        <div class="stat-card-sub" id="stat-aave-sub">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Current APY</div>
+        <div class="stat-card-value stat-green" id="stat-apy"><span class="skeleton skeleton-value">&nbsp;</span></div>
+        <div class="stat-card-sub">Aave V3 supply rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Recommendations</div>
+        <div class="stat-card-value" id="stat-rec-count"><span class="skeleton skeleton-value">&nbsp;</span></div>
+        <div class="stat-card-sub" id="stat-rec-sub">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Strategy Status -->
+    <div class="card fade-in delay-3" style="margin-bottom:1.5rem">
+      <div class="card-header">
+        <span class="card-title">CRE Yield Strategy</span>
+        <div class="card-icon">&#9881;</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.5rem">Strategy Rules</div>
+          <div class="data-row"><span class="data-label">Schedule</span><span class="data-value" style="font-family:var(--font-mono);font-size:0.82rem">Every 5 minutes</span></div>
+          <div class="data-row"><span class="data-label">Deposit when</span><span class="data-value" style="font-size:0.82rem;color:var(--green)">APY ≥ 2% + idle funds</span></div>
+          <div class="data-row"><span class="data-label">Withdraw when</span><span class="data-value" style="font-size:0.82rem;color:var(--red)">APY drops below 1%</span></div>
+          <div class="data-row"><span class="data-label">Min deposit</span><span class="data-value" style="font-family:var(--font-mono);font-size:0.82rem">0.000001 tokens</span></div>
+          <div class="data-row"><span class="data-label">Approval</span><span class="badge badge-green">Human-in-loop</span></div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.5rem">Current Conditions</div>
+          <div class="data-row"><span class="data-label">Aave APY</span><span class="data-value stat-green" id="strategy-apy" style="font-size:0.9rem">--</span></div>
+          <div class="data-row"><span class="data-label">Idle vault funds</span><span class="data-value" id="strategy-idle" style="font-family:var(--font-mono);font-size:0.82rem">--</span></div>
+          <div class="data-row"><span class="data-label">Aave position</span><span class="data-value" id="strategy-aave" style="font-family:var(--font-mono);font-size:0.82rem">--</span></div>
+          <div class="data-row"><span class="data-label">Next action</span><span class="badge" id="strategy-action">Checking...</span></div>
+          <div class="data-row"><span class="data-label">Privacy</span><span class="badge badge-accent">PT Shielded</span></div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <span class="live-dot"></span>
+          <span style="font-size:0.72rem;color:var(--text-secondary)">Automated by Chainlink CRE — runs on decentralized oracle network every 5 min</span>
+        </div>
+        <span style="font-size:0.68rem;font-family:var(--font-mono);color:var(--text-muted)">Forwarder-only access · Owner approves on-chain</span>
+      </div>
+    </div>
+
+    <!-- Operations Panel (Owner Only) -->
+    <div class="card ops-panel fade-in delay-3" id="ops-panel" style="display:none">
+      <div class="card-header">
+        <span class="card-title">Operations</span>
+        <div class="card-icon">&#9881;</div>
+      </div>
+      <div class="ops-tabs">
+        <button type="button" class="ops-tab active" id="tab-vault" onclick="switchOpsTab('vault')">Vault Deposit / Withdraw</button>
+        <button type="button" class="ops-tab" id="tab-aave" onclick="switchOpsTab('aave')">Aave Pool</button>
+      </div>
+
+      <!-- Vault Tab -->
+      <div class="ops-body active" id="ops-vault">
+        <div class="ops-form">
+          <div class="ops-field">
+            <span class="ops-label">Token</span>
+            <select class="ops-select" id="vault-token" onchange="updateVaultBalances()">
+              <option value="ghost">GhostToken</option>
+              <option value="test">Aave Test Token</option>
+            </select>
+          </div>
+          <div class="ops-field">
+            <label class="ops-label" for="vault-amount">Amount</label>
+            <div class="ops-input-wrap">
+              <input class="ops-input" id="vault-amount" type="text" inputmode="decimal" placeholder="0.0" autocomplete="off">
+              <button type="button" class="ops-max-btn" onclick="fillMax('vault')">MAX</button>
+            </div>
+          </div>
+          <div class="ops-balances" id="vault-balances">
+            <div class="ops-bal-card">
+              <div class="ops-bal-label">Your Wallet</div>
+              <div class="ops-bal-value" id="vault-user-bal">--</div>
+            </div>
+            <div class="ops-bal-card">
+              <div class="ops-bal-label">Vault Balance</div>
+              <div class="ops-bal-value" id="vault-vault-bal">--</div>
+            </div>
+            <div class="ops-bal-card">
+              <div class="ops-bal-label">Allowance</div>
+              <div class="ops-bal-value" id="vault-allowance">--</div>
+            </div>
+          </div>
+          <div class="ops-actions">
+            <button type="button" class="ops-btn ops-btn-deposit" id="btn-vault-deposit" onclick="vaultDeposit()">Deposit to Vault</button>
+            <button type="button" class="ops-btn ops-btn-withdraw" id="btn-vault-withdraw" onclick="vaultWithdraw()">Withdraw from Vault</button>
+            <span class="ops-status" id="vault-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aave Pool Tab -->
+      <div class="ops-body" id="ops-aave">
+        <div class="ops-form">
+          <div class="ops-field">
+            <span class="ops-label">Token</span>
+            <select class="ops-select" id="aave-token" onchange="updateAaveBalances()">
+              <option value="ghost">GhostToken</option>
+              <option value="test">Aave Test Token</option>
+            </select>
+          </div>
+          <div class="ops-field">
+            <label class="ops-label" for="aave-amount">Amount</label>
+            <div class="ops-input-wrap">
+              <input class="ops-input" id="aave-amount" type="text" inputmode="decimal" placeholder="0.0" autocomplete="off">
+              <button type="button" class="ops-max-btn" onclick="fillMax('aave')">MAX</button>
+            </div>
+          </div>
+          <div class="ops-balances" id="aave-balances">
+            <div class="ops-bal-card">
+              <div class="ops-bal-label">Vault Idle Balance</div>
+              <div class="ops-bal-value" id="aave-idle-bal">--</div>
+            </div>
+            <div class="ops-bal-card">
+              <div class="ops-bal-label">Aave Supplied</div>
+              <div class="ops-bal-value" id="aave-supplied-bal">--</div>
+            </div>
+          </div>
+          <div class="ops-actions">
+            <button type="button" class="ops-btn ops-btn-supply" id="btn-aave-supply" onclick="aaveSupply()">Supply to Aave</button>
+            <button type="button" class="ops-btn ops-btn-withdraw" id="btn-aave-withdraw" onclick="aaveWithdraw()">Withdraw from Aave</button>
+            <span class="ops-status" id="aave-status"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid">
+      <!-- Recommendations (wide) -->
+      <div class="card col-8 fade-in delay-4">
+        <div class="card-header">
+          <span class="card-title">Recent Recommendations</span>
+          <div class="card-icon">&#9670;</div>
+        </div>
+        <div id="recommendations">
+          <div class="skeleton skeleton-line"></div>
+          <div class="skeleton skeleton-line" style="width:80%"></div>
+          <div class="skeleton skeleton-line" style="width:50%"></div>
+        </div>
+      </div>
+
+      <!-- ACE Policies -->
+      <div class="card col-4 fade-in delay-4">
+        <div class="card-header">
+          <span class="card-title">ACE Policies</span>
+          <div class="card-icon">&#9741;</div>
+        </div>
+        <div id="policies">
+          <div class="skeleton skeleton-line"></div>
+          <div class="skeleton skeleton-line" style="width:70%"></div>
+        </div>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="card col-12 fade-in delay-5">
+        <div class="card-header">
+          <span class="card-title">Vault Activity</span>
+          <div class="card-icon">&#9889;</div>
+        </div>
+        <div id="activity-feed">
+          <div class="skeleton skeleton-line"></div>
+          <div class="skeleton skeleton-line" style="width:80%"></div>
+        </div>
+      </div>
+
+      <!-- Deployed Contracts -->
+      <div class="card col-6 fade-in delay-5">
+        <div class="card-header">
+          <span class="card-title">Deployed Contracts</span>
+          <div class="card-icon">&#9032;</div>
+        </div>
+        <div id="contracts">
+          <div class="contract-row">
+            <span class="contract-name">GhostFundVault</span>
+            <span class="contract-addr" onclick="copyAddr(this)" data-full="0x4964991514f731CB3CF252108dFF889d30036fcb" title="Click to copy">0x4964...6fcb</span>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name">GhostToken</span>
+            <span class="contract-addr" onclick="copyAddr(this)" data-full="0xB9431b3be9a56a1eeA8E728326332f8B4dD51382" title="Click to copy">0xB943...1382</span>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name">PolicyEngine</span>
+            <span class="contract-addr" onclick="copyAddr(this)" data-full="0x73247d30cb15eF7884D8f8992D7D1692c7f6a1E4" title="Click to copy">0x7324...a1E4</span>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name">PT Vault</span>
+            <span class="contract-addr" onclick="copyAddr(this)" data-full="0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13" title="Click to copy">0xE588...2d13</span>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name">DepositExtractor</span>
+            <span class="contract-addr" onclick="copyAddr(this)" data-full="0x15fb3265fefc1cB42A2c990DED55fb3a448689d4" title="Click to copy">0x15fb...89d4</span>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name">Aave V3 Pool</span>
+            <span class="contract-addr" onclick="copyAddr(this)" data-full="0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951" title="Click to copy">0x6Ae4...8951</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vault Details -->
+      <div class="card col-6 fade-in delay-6">
+        <div class="card-header">
+          <span class="card-title">Vault Details</span>
+          <div class="card-icon">&#8942;</div>
+        </div>
+        <div id="vault-details">
+          <div class="skeleton skeleton-line"></div>
+          <div class="skeleton skeleton-line" style="width:70%"></div>
+          <div class="skeleton skeleton-line" style="width:55%"></div>
+        </div>
+      </div>
+    </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer fade-in delay-6">
+      <div>
+        <span id="refresh-bar">Auto-refresh every 30s</span>
+        <div class="tech-badges" style="margin-top:0.6rem">
+          <span class="tech-badge"><span class="dot" style="background:var(--accent)"></span>Chainlink CRE</span>
+          <span class="tech-badge"><span class="dot" style="background:var(--cyan)"></span>Private Tx</span>
+          <span class="tech-badge"><span class="dot" style="background:var(--green)"></span>ACE</span>
+          <span class="tech-badge"><span class="dot" style="background:#f59e0b"></span>Aave V3</span>
+          <span class="tech-badge"><span class="dot" style="background:var(--red)"></span>Sepolia</span>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="https://sepolia.etherscan.io/address/0x4964991514f731CB3CF252108dFF889d30036fcb" target="_blank" rel="noopener">Vault on Etherscan ↗</a>
+        <a href="https://sepolia.etherscan.io/address/0xB9431b3be9a56a1eeA8E728326332f8B4dD51382" target="_blank" rel="noopener">GhostToken ↗</a>
+      </div>
+    </footer>
+  </div>
+
+<script>
+const VAULT = '0x4964991514f731CB3CF252108dFF889d30036fcb';
+const GHOST_TOKEN = '0xB9431b3be9a56a1eeA8E728326332f8B4dD51382';
+const AAVE_TEST_TOKEN = '0xf8Fb3713D459D7C1018BD0A49D19b4C44290EBE5';
+const RPC = 'https://ethereum-sepolia-rpc.publicnode.com';
+const ETHERSCAN_API_KEY = '';
+
+const VAULT_ABI = [
+  'function owner() view returns (address)',
+  'function recommendationCount() view returns (uint256)',
+  'function getRecommendation(uint256) view returns (tuple(uint8 action, address asset, uint256 amount, uint256 apy, uint256 timestamp, bool executed))',
+  'function getAavePosition(address) view returns (uint256 apy, uint256 balance)',
+  'function getVaultBalance(address) view returns (uint256)',
+  'function userApprove(uint256 recId)',
+  'function deposit(address asset, uint256 amount)',
+  'function withdraw(address asset, uint256 amount)',
+  'function depositToPool(address asset, uint256 amount)',
+  'function withdrawFromPool(address asset, uint256 amount)',
+];
+const ERC20_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+  'function symbol() view returns (string)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+];
+
+const TOKENS = {
+  ghost: GHOST_TOKEN,
+  test: AAVE_TEST_TOKEN,
+};
+
+let provider;
+
+const decimalsCache = {};
+async function getDecimals(tokenAddr) {
+  if (decimalsCache[tokenAddr]) return decimalsCache[tokenAddr];
+  const token = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
+  const d = await rpcRetry(() => token.decimals());
+  decimalsCache[tokenAddr] = Number(d);
+  return Number(d);
+}
+
+function fmt(val, dec = 18) {
+  const n = Number(ethers.formatUnits(val, dec));
+  if (n === 0) return '0';
+  if (n < 0.001) return '<0.001';
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function shortAddr(a) { return a.slice(0, 6) + '...' + a.slice(-4); }
+
+function copyAddr(el) {
+  const full = el.dataset.full || el.textContent;
+  navigator.clipboard.writeText(full).then(() => {
+    const orig = el.textContent;
+    el.textContent = 'Copied!';
+    el.style.color = 'var(--green)';
+    setTimeout(() => { el.textContent = orig; el.style.color = ''; }, 1200);
+  });
+}
+
+function actionLabel(a) {
+  const n = Number(a);
+  if (n === 1) return { text: 'DEPOSIT', cls: 'badge-green', icon: '\u2191' };
+  if (n === 2) return { text: 'WITHDRAW', cls: 'badge-red', icon: '\u2193' };
+  return { text: 'NONE', cls: 'badge-yellow', icon: '\u2500' };
+}
+
+// ── RPC helpers (rate-limit safe) ──
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function rpcRetry(fn, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try { return await fn(); } catch (err) {
+      if (i === retries - 1) throw err;
+      await sleep(300 * (i + 1));
+    }
+  }
+}
+
+async function loadStats() {
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    const token = new ethers.Contract(GHOST_TOKEN, ERC20_ABI, provider);
+
+    const owner = await rpcRetry(() => vault.owner());
+    const recCount = await rpcRetry(() => vault.recommendationCount());
+    const ghostBal = await rpcRetry(() => token.balanceOf(VAULT));
+
+    document.getElementById('stat-ghost-bal').textContent = fmt(ghostBal);
+    document.getElementById('stat-ghost-sub').textContent = 'in vault';
+    document.getElementById('stat-rec-count').textContent = recCount.toString();
+
+    const executed = [];
+    const n = Number(recCount);
+    for (let i = 0; i < Math.min(n, 10); i++) {
+      const rec = await rpcRetry(() => vault.getRecommendation(i));
+      if (rec.executed) executed.push(i);
+    }
+    document.getElementById('stat-rec-sub').textContent = executed.length + '/' + Math.min(n, 10) + ' executed';
+
+    // Vault details
+    let testBal = 0n;
+    try {
+      const tt = new ethers.Contract(AAVE_TEST_TOKEN, ERC20_ABI, provider);
+      testBal = await rpcRetry(() => tt.balanceOf(VAULT));
+    } catch {}
+
+    const detailsEl = document.getElementById('vault-details');
+    detailsEl.innerHTML =
+      '<div class="data-row"><span class="data-label">Owner</span><span class="data-addr" data-full="" onclick="copyAddr(this)" title="Click to copy"></span></div>' +
+      '<div class="data-row"><span class="data-label">GhostToken</span><span class="data-value">' + fmt(ghostBal) + '</span></div>' +
+      '<div class="data-row"><span class="data-label">Test Token</span><span class="data-value">' + fmt(testBal) + '</span></div>' +
+      '<div class="data-row"><span class="data-label">Approval Window</span><span class="data-value" style="color:var(--cyan)">1 hour TTL</span></div>' +
+      '<div class="data-row"><span class="data-label">Human-in-Loop</span><span class="badge badge-green">Enforced</span></div>';
+    const ownerSpan = detailsEl.querySelector('.data-addr');
+    ownerSpan.textContent = shortAddr(owner);
+    ownerSpan.dataset.full = owner;
+  } catch (err) {
+    document.getElementById('stat-ghost-bal').textContent = '--';
+    document.getElementById('stat-ghost-sub').textContent = 'Error loading';
+    const errSpan = document.createElement('span');
+    errSpan.style.cssText = 'color:var(--red);font-size:0.82rem';
+    errSpan.textContent = 'Error: ' + err.message.slice(0, 60);
+    const detailsErr = document.getElementById('vault-details');
+    detailsErr.innerHTML = '';
+    detailsErr.appendChild(errSpan);
+  }
+}
+
+async function loadAave() {
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    const [apy, balance] = await rpcRetry(() => vault.getAavePosition(AAVE_TEST_TOKEN));
+    const apyPct = (Number(apy) / 1e25).toFixed(2);
+    document.getElementById('stat-aave-bal').textContent = fmt(balance);
+    document.getElementById('stat-aave-sub').textContent = 'on Aave V3';
+    document.getElementById('stat-apy').textContent = apyPct + '%';
+  } catch {
+    document.getElementById('stat-aave-bal').textContent = '0';
+    document.getElementById('stat-aave-sub').textContent = 'no position';
+    document.getElementById('stat-apy').textContent = '--';
+  }
+}
+
+async function loadRecommendations() {
+  const el = document.getElementById('recommendations');
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    const count = await rpcRetry(() => vault.recommendationCount());
+    const n = Number(count);
+    if (n === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:2rem 0;color:var(--text-muted)">No recommendations yet. CRE workflow will generate them.</div>';
+      return;
+    }
+    const toShow = Math.min(n, 5);
+    let html = '';
+    for (let i = n - 1; i >= n - toShow; i--) {
+      const rec = await rpcRetry(() => vault.getRecommendation(i));
+      const label = actionLabel(rec.action);
+      const time = new Date(Number(rec.timestamp) * 1000);
+      const apyPct = (Number(rec.apy) / 100).toFixed(2);
+      const ttlEnd = Number(rec.timestamp) + 3600;
+      const now = Math.floor(Date.now() / 1000);
+      let ttlBadge = '';
+      const canApprove = !rec.executed && now <= ttlEnd && walletAddress && vaultOwner && walletAddress.toLowerCase() === vaultOwner;
+      if (rec.executed) {
+        ttlBadge = '<span class="badge badge-green">Executed</span>';
+      } else if (now > ttlEnd) {
+        ttlBadge = '<span class="badge badge-red">Expired</span>';
+      } else {
+        const mins = Math.floor((ttlEnd - now) / 60);
+        ttlBadge = canApprove
+          ? '<button type="button" class="btn-approve" id="approve-' + i + '" onclick="approveRec(' + i + ')">Approve</button>'
+          : '<span class="badge badge-yellow">' + mins + 'm left</span>';
+      }
+      html +=
+        '<div class="rec-item">' +
+          '<div class="rec-row">' +
+            '<div class="rec-left">' +
+              '<span class="rec-id">#' + i + '</span>' +
+              '<span class="badge ' + label.cls + '">' + label.icon + ' ' + label.text + '</span>' +
+              (canApprove ? '<span class="badge badge-yellow">' + Math.floor((ttlEnd - now) / 60) + 'm left</span>' : '') +
+            '</div>' +
+            ttlBadge +
+          '</div>' +
+          '<div class="rec-meta">' + fmt(rec.amount) + ' tokens &middot; ' + apyPct + '% APY &middot; ' + time.toLocaleString() + '</div>' +
+        '</div>';
+    }
+    el.innerHTML = html;
+  } catch (err) {
+    const errEl = document.createElement('span');
+    errEl.style.cssText = 'color:var(--red);font-size:0.82rem';
+    errEl.textContent = 'Error: ' + err.message.slice(0, 60);
+    el.innerHTML = '';
+    el.appendChild(errEl);
+  }
+}
+
+async function loadPolicies() {
+  const el = document.getElementById('policies');
+  const policies = [
+    { name: 'AllowPolicy', addr: '0xB9fa55C5f14Fac82e6b9133284bE9EF912dbA33e', desc: 'Address whitelist' },
+    { name: 'MaxPolicy', addr: '0xfD46dE36745402238826672af2132e59f1caDbBA', desc: 'Deposit caps' },
+    { name: 'PausePolicy', addr: '0x9A9a6BB879F51A89A340305d1fFf92A0873A938f', desc: 'Emergency halt' },
+    { name: 'DepositExtractor', addr: '0x15fb3265fefc1cB42A2c990DED55fb3a448689d4', desc: 'Param extraction' },
+  ];
+  let html = '';
+  for (const p of policies) {
+    const code = await rpcRetry(() => provider.getCode(p.addr));
+    const live = code !== '0x';
+    html +=
+      '<div class="policy-item">' +
+        '<div class="policy-info">' +
+          '<span class="policy-name">' + p.name + '</span>' +
+          '<span class="policy-desc">' + p.desc + '</span>' +
+        '</div>' +
+        '<span class="badge ' + (live ? 'badge-green' : 'badge-red') + '">' + (live ? 'Live' : 'Missing') + '</span>' +
+      '</div>';
+  }
+  el.innerHTML = html;
+}
+
+async function loadBlock() {
+  try {
+    const block = await rpcRetry(() => provider.getBlockNumber());
+    document.getElementById('block-display').textContent = 'Block ' + block.toLocaleString();
+  } catch {}
+}
+
+async function loadStrategy() {
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    const token = new ethers.Contract(AAVE_TEST_TOKEN, ERC20_ABI, provider);
+    const [apy, aaveBalance] = await rpcRetry(() => vault.getAavePosition(AAVE_TEST_TOKEN));
+    const idleBalance = await rpcRetry(() => token.balanceOf(VAULT));
+    const apyPct = (Number(apy) / 1e25).toFixed(2);
+    document.getElementById('strategy-apy').textContent = apyPct + '%';
+    document.getElementById('strategy-idle').textContent = fmt(idleBalance);
+    document.getElementById('strategy-aave').textContent = fmt(aaveBalance);
+    const actionEl = document.getElementById('strategy-action');
+    const apyBps = Number(apy) / 1e23;
+    if (idleBalance > 1000000n && apyBps >= 200) {
+      actionEl.textContent = '↑ DEPOSIT recommended';
+      actionEl.className = 'badge badge-green';
+    } else if (aaveBalance > 0n && apyBps < 100) {
+      actionEl.textContent = '↓ WITHDRAW recommended';
+      actionEl.className = 'badge badge-red';
+    } else {
+      actionEl.textContent = '— No action needed';
+      actionEl.className = 'badge badge-yellow';
+    }
+  } catch {
+    document.getElementById('strategy-action').textContent = 'Unavailable';
+    document.getElementById('strategy-action').className = 'badge';
+  }
+}
+
+async function loadActivity() {
+  const el = document.getElementById('activity-feed');
+  try {
+    const apiKeyParam = ETHERSCAN_API_KEY ? '&apikey=' + ETHERSCAN_API_KEY : '';
+    const url = 'https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=' + VAULT + '&startblock=0&endblock=99999999&page=1&offset=10&sort=desc' + apiKeyParam;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.status !== '1' || !data.result || !data.result.length) {
+      el.innerHTML = '<div style="text-align:center;padding:1.5rem 0;color:var(--text-muted)">No recent activity</div>';
+      return;
+    }
+    const METHOD_MAP = {
+      '0xb6b55f25': { label: 'Deposit', icon: '↑', cls: 'deposit' },
+      '0x69328dec': { label: 'Withdraw', icon: '↓', cls: 'withdraw' },
+      '0xe8eda9df': { label: 'Supply to Aave', icon: '⇡', cls: 'supply' },
+      '0x47e7ef24': { label: 'Deposit', icon: '↑', cls: 'deposit' },
+      '0x2e1a7d4d': { label: 'Withdraw', icon: '↓', cls: 'withdraw' },
+      '0xc0e5fd0a': { label: 'CRE Report', icon: '◆', cls: 'recommend' },
+      '0x0b86d985': { label: 'Approve Rec', icon: '✓', cls: 'deposit' },
+    };
+    const fragment = document.createDocumentFragment();
+    for (const tx of data.result.slice(0, 8)) {
+      const sig = tx.input.slice(0, 10);
+      const method = METHOD_MAP[sig] || { label: tx.functionName ? tx.functionName.split('(')[0] : 'Contract Call', icon: '•', cls: 'other' };
+      const time = new Date(Number(tx.timeStamp) * 1000);
+      const ago = getTimeAgo(time);
+      const ok = tx.isError === '0';
+      const item = document.createElement('div');
+      item.className = 'activity-item';
+      const left = document.createElement('div');
+      left.className = 'activity-left';
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'activity-icon ' + method.cls;
+      iconDiv.textContent = method.icon;
+      const info = document.createElement('div');
+      const desc = document.createElement('div');
+      desc.className = 'activity-desc';
+      desc.textContent = method.label + (ok ? '' : ' (failed)');
+      if (!ok) desc.style.color = 'var(--red)';
+      const sub = document.createElement('div');
+      sub.className = 'activity-sub';
+      sub.textContent = 'from ' + tx.from.slice(0,6) + '...' + tx.from.slice(-4);
+      info.appendChild(desc);
+      info.appendChild(sub);
+      left.appendChild(iconDiv);
+      left.appendChild(info);
+      const right = document.createElement('div');
+      right.className = 'activity-right';
+      const timeDiv = document.createElement('div');
+      timeDiv.className = 'activity-time';
+      timeDiv.textContent = ago;
+      const link = document.createElement('a');
+      link.className = 'activity-hash';
+      link.href = 'https://sepolia.etherscan.io/tx/' + tx.hash;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = tx.hash.slice(0,10) + '...';
+      right.appendChild(timeDiv);
+      right.appendChild(link);
+      item.appendChild(left);
+      item.appendChild(right);
+      fragment.appendChild(item);
+    }
+    el.innerHTML = '';
+    el.appendChild(fragment);
+  } catch {
+    el.innerHTML = '<div style="text-align:center;padding:1.5rem 0;color:var(--text-muted)">Activity unavailable</div>';
+  }
+}
+
+function getTimeAgo(date) {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+async function refresh() {
+  // Serialize to avoid free RPC rate limits
+  let failed = false;
+  await loadStats().catch(() => { failed = true; });
+  await loadAave().catch(() => { failed = true; });
+  await loadStrategy().catch(() => { failed = true; });
+  await loadRecommendations().catch(() => { failed = true; });
+  await loadActivity().catch(() => { failed = true; });
+  await loadPolicies().catch(() => { failed = true; });
+  await loadBlock().catch(() => { failed = true; });
+  document.getElementById('refresh-bar').textContent =
+    'Updated ' + new Date().toLocaleTimeString() + ' \u2014 auto-refresh 30s';
+  const dot = document.querySelector('.live-indicator .live-dot');
+  if (dot) dot.style.background = failed ? 'var(--red)' : 'var(--green)';
+}
+
+// ── Wallet & Transactions ──
+let signer = null;
+let walletAddress = null;
+let vaultOwner = null;
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type + ' show';
+  setTimeout(() => { t.classList.remove('show'); }, 4000);
+}
+
+async function connectWallet() {
+  const btn = document.getElementById('btn-wallet');
+  if (signer) {
+    signer = null;
+    walletAddress = null;
+    btn.textContent = 'Connect Wallet';
+    btn.classList.remove('connected');
+    showOpsPanel();
+    await refresh();
+    return;
+  }
+  // Find wallet provider (handle multiple extensions)
+  let eth = window.ethereum;
+  if (!eth) {
+    showToast('No wallet detected. Install MetaMask.', 'error');
+    return;
+  }
+  // If multiple providers, prefer MetaMask
+  if (eth.providers && eth.providers.length) {
+    eth = eth.providers.find(p => p.isMetaMask) || eth.providers[0];
+  }
+  try {
+    const browserProvider = new ethers.BrowserProvider(eth);
+    await browserProvider.send('eth_requestAccounts', []);
+    // Auto-switch to Sepolia if on wrong network
+    const network = await browserProvider.getNetwork();
+    if (Number(network.chainId) !== 11155111) {
+      try {
+        await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+      } catch (switchErr) {
+        if (switchErr.code === 4902) {
+          await eth.request({ method: 'wallet_addEthereumChain', params: [{
+            chainId: '0xaa36a7', chainName: 'Sepolia',
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
+            blockExplorerUrls: ['https://sepolia.etherscan.io']
+          }] });
+        } else { throw switchErr; }
+      }
+      // Re-create provider after network switch
+      const newProvider = new ethers.BrowserProvider(eth);
+      signer = await newProvider.getSigner();
+    } else {
+      signer = await browserProvider.getSigner();
+    }
+    walletAddress = await signer.getAddress();
+    btn.textContent = shortAddr(walletAddress);
+    btn.classList.add('connected');
+    showToast('Wallet connected on Sepolia', 'success');
+    showOpsPanel();
+    eth.on('accountsChanged', async (accounts) => {
+      if (!accounts.length) {
+        signer = null;
+        walletAddress = null;
+        btn.textContent = 'Connect Wallet';
+        btn.classList.remove('connected');
+        showOpsPanel();
+      } else {
+        const newProvider = new ethers.BrowserProvider(eth);
+        signer = await newProvider.getSigner();
+        walletAddress = await signer.getAddress();
+        btn.textContent = shortAddr(walletAddress);
+        showOpsPanel();
+      }
+      await refresh();
+    });
+    eth.on('chainChanged', () => { window.location.reload(); });
+    await refresh();
+  } catch (err) {
+    showToast('Connection failed: ' + (err.message || err).slice(0, 50), 'error');
+  }
+}
+
+async function approveRec(recId) {
+  if (!signer) {
+    showToast('Connect wallet first', 'error');
+    return;
+  }
+  const btn = document.getElementById('approve-' + recId);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Signing...';
+    btn.classList.add('pending');
+  }
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, signer);
+    const tx = await vault.userApprove(recId);
+    if (btn) btn.textContent = 'Confirming...';
+    await tx.wait();
+    showToast('Recommendation #' + recId + ' approved!', 'success');
+    await refresh();
+  } catch (err) {
+    const msg = err.reason || err.message || String(err);
+    showToast('Approve failed: ' + msg.slice(0, 60), 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Approve';
+      btn.classList.remove('pending');
+    }
+  }
+}
+
+// ── Operations Panel ──
+function switchOpsTab(tab) {
+  document.querySelectorAll('.ops-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ops-body').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('ops-' + tab).classList.add('active');
+  if (tab === 'vault') {
+    updateVaultBalances();
+  } else {
+    updateAaveBalances();
+  }
+}
+
+async function showOpsPanel() {
+  const panel = document.getElementById('ops-panel');
+  // Fetch vault owner if not cached yet
+  if (!vaultOwner) {
+    try {
+      const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+      vaultOwner = (await vault.owner()).toLowerCase();
+    } catch {}
+  }
+  if (walletAddress && vaultOwner && walletAddress.toLowerCase() === vaultOwner) {
+    panel.style.display = '';
+    updateVaultBalances();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function getSelectedToken(prefix) {
+  return document.getElementById(prefix + '-token').value;
+}
+
+function getTokenAddr(key) {
+  return TOKENS[key];
+}
+
+function setStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'ops-status' + (type ? ' ' + type : '');
+}
+
+async function updateVaultBalances() {
+  if (!signer || !walletAddress) return;
+  const tokenKey = getSelectedToken('vault');
+  const tokenAddr = getTokenAddr(tokenKey);
+  try {
+    const token = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    const [userBal, vaultBal, allowance] = await Promise.all([
+      token.balanceOf(walletAddress),
+      vault.getVaultBalance(tokenAddr),
+      token.allowance(walletAddress, VAULT),
+    ]);
+    document.getElementById('vault-user-bal').textContent = fmt(userBal);
+    document.getElementById('vault-user-bal').dataset.raw = userBal.toString();
+    document.getElementById('vault-vault-bal').textContent = fmt(vaultBal);
+    document.getElementById('vault-vault-bal').dataset.raw = vaultBal.toString();
+    document.getElementById('vault-allowance').textContent = fmt(allowance);
+  } catch (err) {
+    document.getElementById('vault-user-bal').textContent = 'Error';
+  }
+}
+
+async function updateAaveBalances() {
+  if (!signer || !walletAddress) return;
+  const tokenKey = getSelectedToken('aave');
+  const tokenAddr = getTokenAddr(tokenKey);
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    const [idleBal, aavePos] = await Promise.all([
+      vault.getVaultBalance(tokenAddr),
+      vault.getAavePosition(tokenAddr),
+    ]);
+    document.getElementById('aave-idle-bal').textContent = fmt(idleBal);
+    document.getElementById('aave-idle-bal').dataset.raw = idleBal.toString();
+    document.getElementById('aave-supplied-bal').textContent = fmt(aavePos.balance);
+    document.getElementById('aave-supplied-bal').dataset.raw = aavePos.balance.toString();
+  } catch (err) {
+    document.getElementById('aave-idle-bal').textContent = 'Error';
+  }
+}
+
+function fillMax(prefix) {
+  const tokenAddr = getTokenAddr(getSelectedToken(prefix));
+  const dec = decimalsCache[tokenAddr] || 18;
+  if (prefix === 'vault') {
+    const walletRaw = document.getElementById('vault-user-bal').dataset.raw;
+    const vaultRaw = document.getElementById('vault-vault-bal').dataset.raw;
+    const walletVal = BigInt(walletRaw || '0');
+    const vaultVal = BigInt(vaultRaw || '0');
+    const raw = walletVal >= vaultVal ? walletRaw : vaultRaw;
+    if (raw && raw !== '0') {
+      document.getElementById('vault-amount').value = ethers.formatUnits(raw, dec);
+    }
+  } else {
+    const idleRaw = document.getElementById('aave-idle-bal').dataset.raw;
+    const suppliedRaw = document.getElementById('aave-supplied-bal').dataset.raw;
+    const idleVal = BigInt(idleRaw || '0');
+    const suppliedVal = BigInt(suppliedRaw || '0');
+    const raw = idleVal >= suppliedVal ? idleRaw : suppliedRaw;
+    if (raw && raw !== '0') {
+      document.getElementById('aave-amount').value = ethers.formatUnits(raw, dec);
+    }
+  }
+}
+
+function disableOpsButtons(prefix, disabled) {
+  const btns = document.querySelectorAll('#ops-' + prefix + ' .ops-btn');
+  btns.forEach(b => b.disabled = disabled);
+}
+
+async function vaultDeposit() {
+  if (!signer) return;
+  const tokenKey = getSelectedToken('vault');
+  const tokenAddr = getTokenAddr(tokenKey);
+  const amountStr = document.getElementById('vault-amount').value.trim();
+  if (!amountStr || isNaN(Number(amountStr)) || Number(amountStr) <= 0) {
+    showToast('Enter a valid amount', 'error');
+    return;
+  }
+  const decimals = await getDecimals(tokenAddr);
+  const amount = ethers.parseUnits(amountStr, decimals);
+  disableOpsButtons('vault', true);
+
+  try {
+    // Step 1: Check allowance and approve if needed
+    const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
+    const currentAllowance = await token.allowance(walletAddress, VAULT);
+    if (currentAllowance < amount) {
+      setStatus('vault-status', 'Step 1/2: Approving token spend...', 'pending');
+      const approveTx = await token.approve(VAULT, amount);
+      setStatus('vault-status', 'Confirming approval...', 'pending');
+      await approveTx.wait();
+      setStatus('vault-status', 'Approved! Step 2/2: Depositing...', 'pending');
+    } else {
+      setStatus('vault-status', 'Depositing...', 'pending');
+    }
+
+    // Step 2: Deposit to vault
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, signer);
+    const tx = await vault.deposit(tokenAddr, amount);
+    setStatus('vault-status', 'Confirming deposit...', 'pending');
+    await tx.wait();
+    setStatus('vault-status', 'Deposited ' + amountStr + ' tokens', 'success');
+    showToast('Deposit successful!', 'success');
+    document.getElementById('vault-amount').value = '';
+    await Promise.all([updateVaultBalances(), refresh()]);
+  } catch (err) {
+    const msg = err.reason || err.message || String(err);
+    setStatus('vault-status', 'Failed: ' + msg.slice(0, 60), 'error');
+    showToast('Deposit failed: ' + msg.slice(0, 50), 'error');
+  } finally {
+    disableOpsButtons('vault', false);
+  }
+}
+
+async function vaultWithdraw() {
+  if (!signer) return;
+  const tokenKey = getSelectedToken('vault');
+  const tokenAddr = getTokenAddr(tokenKey);
+  const amountStr = document.getElementById('vault-amount').value.trim();
+  if (!amountStr || isNaN(Number(amountStr)) || Number(amountStr) <= 0) {
+    showToast('Enter a valid amount', 'error');
+    return;
+  }
+  const decimals = await getDecimals(tokenAddr);
+  const amount = ethers.parseUnits(amountStr, decimals);
+  disableOpsButtons('vault', true);
+  setStatus('vault-status', 'Withdrawing...', 'pending');
+
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, signer);
+    const tx = await vault.withdraw(tokenAddr, amount);
+    setStatus('vault-status', 'Confirming withdrawal...', 'pending');
+    await tx.wait();
+    setStatus('vault-status', 'Withdrew ' + amountStr + ' tokens', 'success');
+    showToast('Withdrawal successful!', 'success');
+    document.getElementById('vault-amount').value = '';
+    await Promise.all([updateVaultBalances(), refresh()]);
+  } catch (err) {
+    const msg = err.reason || err.message || String(err);
+    setStatus('vault-status', 'Failed: ' + msg.slice(0, 60), 'error');
+    showToast('Withdraw failed: ' + msg.slice(0, 50), 'error');
+  } finally {
+    disableOpsButtons('vault', false);
+  }
+}
+
+async function aaveSupply() {
+  if (!signer) return;
+  const tokenKey = getSelectedToken('aave');
+  const tokenAddr = getTokenAddr(tokenKey);
+  const amountStr = document.getElementById('aave-amount').value.trim();
+  if (!amountStr || isNaN(Number(amountStr)) || Number(amountStr) <= 0) {
+    showToast('Enter a valid amount', 'error');
+    return;
+  }
+  const decimals = await getDecimals(tokenAddr);
+  const amount = ethers.parseUnits(amountStr, decimals);
+  disableOpsButtons('aave', true);
+  setStatus('aave-status', 'Supplying to Aave...', 'pending');
+
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, signer);
+    const tx = await vault.depositToPool(tokenAddr, amount);
+    setStatus('aave-status', 'Confirming supply...', 'pending');
+    await tx.wait();
+    setStatus('aave-status', 'Supplied ' + amountStr + ' to Aave', 'success');
+    showToast('Aave supply successful!', 'success');
+    document.getElementById('aave-amount').value = '';
+    await Promise.all([updateAaveBalances(), refresh()]);
+  } catch (err) {
+    const msg = err.reason || err.message || String(err);
+    setStatus('aave-status', 'Failed: ' + msg.slice(0, 60), 'error');
+    showToast('Aave supply failed: ' + msg.slice(0, 50), 'error');
+  } finally {
+    disableOpsButtons('aave', false);
+  }
+}
+
+async function aaveWithdraw() {
+  if (!signer) return;
+  const tokenKey = getSelectedToken('aave');
+  const tokenAddr = getTokenAddr(tokenKey);
+  const amountStr = document.getElementById('aave-amount').value.trim();
+  if (!amountStr || isNaN(Number(amountStr)) || Number(amountStr) <= 0) {
+    showToast('Enter a valid amount', 'error');
+    return;
+  }
+  const decimals = await getDecimals(tokenAddr);
+  const amount = ethers.parseUnits(amountStr, decimals);
+  disableOpsButtons('aave', true);
+  setStatus('aave-status', 'Withdrawing from Aave...', 'pending');
+
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, signer);
+    const tx = await vault.withdrawFromPool(tokenAddr, amount);
+    setStatus('aave-status', 'Confirming withdrawal...', 'pending');
+    await tx.wait();
+    setStatus('aave-status', 'Withdrew ' + amountStr + ' from Aave', 'success');
+    showToast('Aave withdrawal successful!', 'success');
+    document.getElementById('aave-amount').value = '';
+    await Promise.all([updateAaveBalances(), refresh()]);
+  } catch (err) {
+    const msg = err.reason || err.message || String(err);
+    setStatus('aave-status', 'Failed: ' + msg.slice(0, 60), 'error');
+    showToast('Aave withdraw failed: ' + msg.slice(0, 50), 'error');
+  } finally {
+    disableOpsButtons('aave', false);
+  }
+}
+
+async function init() {
+  provider = new ethers.JsonRpcProvider(RPC);
+  // Cache vault owner for button visibility
+  try {
+    const vault = new ethers.Contract(VAULT, VAULT_ABI, provider);
+    vaultOwner = (await vault.owner()).toLowerCase();
+  } catch {}
+  await refresh();
+  window._refreshInterval = setInterval(refresh, 30000);
+}
+
+init();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && window._refreshInterval) {
+    clearInterval(window._refreshInterval);
+    window._refreshInterval = null;
+  } else if (!document.hidden && !window._refreshInterval) {
+    window._refreshInterval = setInterval(refresh, 30000);
+  }
+});
+</script>
+</body>
+</html>

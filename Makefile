@@ -38,21 +38,21 @@ install:
 
 test-sol:
 	@echo "=========================================="
-	@echo "  Solidity unit tests (44)"
+	@echo "  Solidity unit tests (47)"
 	@echo "=========================================="
 	cd contracts && forge test --match-path test/GhostFundVault.t.sol -vv
 	@echo ""
 
 test-fuzz:
 	@echo "=========================================="
-	@echo "  Fuzz tests (7 × 1000 runs)"
+	@echo "  Fuzz tests (8 × 1000 runs)"
 	@echo "=========================================="
 	cd contracts && forge test --match-path test/GhostFundVault.fuzz.t.sol -vv
 	@echo ""
 
 test-invariant:
 	@echo "=========================================="
-	@echo "  Invariant tests (4 × 256 runs)"
+	@echo "  Invariant tests (3 × 256 runs)"
 	@echo "=========================================="
 	cd contracts && forge test --match-path test/GhostFundVault.invariant.t.sol -vv
 	@echo ""

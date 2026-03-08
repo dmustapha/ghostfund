@@ -25,7 +25,7 @@ contract ReentrantToken is ERC20 {
         if (target != address(0) && !attacking && to == target) {
             attacking = true;
             // Attempt reentrancy — try to call withdraw during transfer
-            try GhostFundVault(target).withdraw(address(this), 1) {
+            try GhostFundVault(payable(target)).withdraw(address(this), 1) {
                 // If this succeeds, the reentrancy guard is broken
             } catch {
                 // Expected — ReentrancyGuard should block this
@@ -160,18 +160,9 @@ contract GhostFundVaultSecurityTest is Test {
         address[] memory wos = new address[](1);
         wos[0] = workflowOwner;
 
-        // Deploy with zero address pool
-        GhostFundVault v = new GhostFundVault(fwds, wos, address(0));
-
-        // Pool is set to zero address
-        assertEq(address(v.aavePool()), address(0));
-
-        // onReport still works (doesn't touch pool)
-        bytes memory metadata = _buildMetadata(workflowOwner);
-        bytes memory report = abi.encode(uint8(1), address(token), uint256(1000), uint256(500));
-        vm.prank(forwarder);
-        v.onReport(metadata, report);
-        assertEq(v.recommendationCount(), 1);
+        // Deploy with zero address pool should revert
+        vm.expectRevert("Zero pool address");
+        new GhostFundVault(fwds, wos, address(0));
     }
 
     // ═══════════════════════════════════════════

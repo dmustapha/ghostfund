@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {GhostFundVault} from "../src/GhostFundVault.sol";
 import {GhostToken} from "../src/GhostToken.sol";
-import {MockPool} from "../src/MockPool.sol";
+import {MockPool, MockPoolWithAToken} from "../src/MockPool.sol";
 import {IReceiver} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
 
 contract GhostFundVaultTest is Test {
@@ -171,6 +171,28 @@ contract GhostFundVaultTest is Test {
         assertEq(vault.getVaultBalance(address(token)), 100_000 ether);
     }
 
+    function test_getAavePosition_returnsATokenBalance() public {
+        // Deploy a vault with aToken-aware mock pool
+        MockPoolWithAToken poolWithAToken = new MockPoolWithAToken(50000000000000000000000000);
+
+        address[] memory fwds = new address[](1);
+        fwds[0] = forwarder;
+        address[] memory wos = new address[](1);
+        wos[0] = workflowOwner;
+
+        GhostFundVault v = new GhostFundVault(fwds, wos, address(poolWithAToken));
+        token.transfer(address(v), 50_000 ether);
+
+        // Deposit to pool
+        vm.prank(address(this)); // this is the owner since we deployed v
+        v.depositToPool(address(token), 10_000 ether);
+
+        // Check position
+        (uint256 apy, uint256 balance) = v.getAavePosition(address(token));
+        assertEq(apy, 50000000000000000000000000);
+        assertEq(balance, 10_000 ether);
+    }
+
     function test_getAavePosition_handlesMockWithoutAToken() public view {
         (uint256 apy, uint256 balance) = vault.getAavePosition(address(token));
         assertEq(apy, uint256(50000000000000000000000000));
@@ -207,6 +229,14 @@ contract GhostFundVaultTest is Test {
         GhostFundVault.Recommendation memory rec = vault.getRecommendation(1);
         assertTrue(rec.executed);
         assertEq(uint8(rec.action), 2); // WITHDRAW_FROM_POOL
+    }
+
+    function test_onReport_revertsZeroAmount() public {
+        bytes memory metadata = _buildMetadata(workflowOwner);
+        bytes memory report = abi.encode(uint8(1), address(token), uint256(0), uint256(500));
+        vm.prank(forwarder);
+        vm.expectRevert(GhostFundVault.ZeroAmount.selector);
+        vault.onReport(metadata, report);
     }
 
     function test_onReport_revertsOnActionNone() public {
@@ -363,15 +393,15 @@ contract GhostFundVaultTest is Test {
     }
 
     function test_setKeystoneForwarder_emitsEvent() public {
-        vm.expectEmit(true, false, false, false);
-        emit GhostFundVault.KeystoneForwarderSet(address(0xF2));
+        vm.expectEmit(true, false, false, true);
+        emit GhostFundVault.KeystoneForwarderSet(address(0xF2), true);
 
         vault.setKeystoneForwarder(address(0xF2), true);
     }
 
     function test_setWorkflowOwner_emitsEvent() public {
-        vm.expectEmit(true, false, false, false);
-        emit GhostFundVault.WorkflowOwnerSet(address(0xB2));
+        vm.expectEmit(true, false, false, true);
+        emit GhostFundVault.WorkflowOwnerSet(address(0xB2), true);
 
         vault.setWorkflowOwner(address(0xB2), true);
     }
@@ -466,6 +496,15 @@ contract GhostFundVaultTest is Test {
     // ═══════════════════════════════════════════
     // Constructor tests
     // ═══════════════════════════════════════════
+
+    function test_constructor_revertsZeroPool() public {
+        address[] memory fwds = new address[](1);
+        fwds[0] = forwarder;
+        address[] memory owners = new address[](1);
+        owners[0] = workflowOwner;
+        vm.expectRevert("Zero pool address");
+        new GhostFundVault(fwds, owners, address(0));
+    }
 
     function test_constructor_setsPool() public view {
         assertEq(address(vault.aavePool()), address(pool));

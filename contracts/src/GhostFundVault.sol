@@ -20,12 +20,12 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
     enum Action { NONE, DEPOSIT_TO_POOL, WITHDRAW_FROM_POOL }
 
     struct Recommendation {
-        Action action;
-        address asset;
-        uint256 amount;
-        uint256 apy;
-        uint256 timestamp;
-        bool executed;
+        address asset;     // slot 0: 20 bytes
+        Action action;     // slot 0: +1 byte
+        bool executed;     // slot 0: +1 byte
+        uint256 amount;    // slot 1
+        uint256 apy;       // slot 2
+        uint256 timestamp; // slot 3
     }
 
     // ═══════════════════════════════════════════════════
@@ -52,8 +52,8 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
     );
     event Deposited(address indexed asset, uint256 amount);
     event Withdrawn(address indexed asset, address indexed to, uint256 amount);
-    event KeystoneForwarderSet(address indexed forwarder);
-    event WorkflowOwnerSet(address indexed owner);
+    event KeystoneForwarderSet(address indexed forwarder, bool allowed);
+    event WorkflowOwnerSet(address indexed owner, bool allowed);
 
     // ═══════════════════════════════════════════════════
     // ERRORS
@@ -66,6 +66,7 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
     error RecommendationAlreadyExecuted();
     error RecommendationExpired();
     error InsufficientBalance();
+    error ZeroAmount();
 
     // ═══════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -76,6 +77,7 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
         address[] memory _workflowOwners,
         address _aavePool
     ) {
+        require(_aavePool != address(0), "Zero pool address");
         aavePool = IPool(_aavePool);
         for (uint256 i = 0; i < _keystoneForwarders.length; i++) {
             allowedKeystoneForwarders[_keystoneForwarders[i]] = true;
@@ -89,6 +91,9 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
     // CRE REPORT HANDLER
     // ═══════════════════════════════════════════════════
 
+    /// @notice Stores a CRE recommendation on-chain. Balance checks happen at execution time
+    /// in userApprove, not here — there is a TOCTOU window between recommendation storage and
+    /// owner approval where balances may change. This is by design: the human approver verifies conditions.
     function onReport(bytes calldata metadata, bytes calldata report) external override {
         if (!allowedKeystoneForwarders[msg.sender]) revert MustBeKeystoneForwarder();
 
@@ -97,10 +102,15 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
 
         (uint8 action, address asset, uint256 amount, uint256 apy) =
             abi.decode(report, (uint8, address, uint256, uint256));
+        // NOTE: Asset address is not validated here — onReport only stores data.
+        // Actual fund movement in userApprove is owner-gated; Aave validates reserves.
         if (action == uint8(Action.NONE) || action > uint8(Action.WITHDRAW_FROM_POOL)) {
             revert InvalidAction(action);
         }
+        if (amount == 0) revert ZeroAmount();
 
+        // NOTE: Storage grows monotonically. Bounded by forwarder+owner access control.
+        // Recommendations expire after 1 hour. Production would add pruning.
         uint256 recId = recommendationCount++;
         recommendations[recId] = Recommendation({
             action: Action(action),
@@ -128,11 +138,11 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
 
         if (rec.action == Action.DEPOSIT_TO_POOL) {
             _depositToPool(rec.asset, rec.amount);
+            emit StrategyExecuted(recId, rec.action, rec.asset, rec.amount);
         } else if (rec.action == Action.WITHDRAW_FROM_POOL) {
-            _withdrawFromPool(rec.asset, rec.amount, owner());
+            uint256 actual = _withdrawFromPool(rec.asset, rec.amount, owner());
+            emit StrategyExecuted(recId, rec.action, rec.asset, actual);
         }
-
-        emit StrategyExecuted(recId, rec.action, rec.asset, rec.amount);
     }
 
     // ═══════════════════════════════════════════════════
@@ -146,9 +156,10 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
         emit Deposited(asset, amount);
     }
 
-    function _withdrawFromPool(address asset, uint256 amount, address to) internal {
+    function _withdrawFromPool(address asset, uint256 amount, address to) internal returns (uint256) {
         uint256 actual = aavePool.withdraw(asset, amount, to);
         emit Withdrawn(asset, to, actual);
+        return actual;
     }
 
     // ═══════════════════════════════════════════════════
@@ -156,30 +167,35 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
     // ═══════════════════════════════════════════════════
 
     function deposit(address asset, uint256 amount) external onlyOwner nonReentrant {
+        if (amount == 0) revert ZeroAmount();
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        emit Deposited(asset, amount);
     }
 
     function withdraw(address asset, uint256 amount) external onlyOwner nonReentrant {
+        if (amount == 0) revert ZeroAmount();
         IERC20(asset).safeTransfer(msg.sender, amount);
         emit Withdrawn(asset, msg.sender, amount);
     }
 
     function depositToPool(address asset, uint256 amount) external onlyOwner nonReentrant {
+        if (amount == 0) revert ZeroAmount();
         _depositToPool(asset, amount);
     }
 
     function withdrawFromPool(address asset, uint256 amount) external onlyOwner nonReentrant {
+        if (amount == 0) revert ZeroAmount();
         _withdrawFromPool(asset, amount, msg.sender);
     }
 
     function setKeystoneForwarder(address f, bool allowed) external onlyOwner {
         allowedKeystoneForwarders[f] = allowed;
-        emit KeystoneForwarderSet(f);
+        emit KeystoneForwarderSet(f, allowed);
     }
 
     function setWorkflowOwner(address o, bool allowed) external onlyOwner {
         allowedWorkflowOwners[o] = allowed;
-        emit WorkflowOwnerSet(o);
+        emit WorkflowOwnerSet(o, allowed);
     }
 
     // ═══════════════════════════════════════════════════
@@ -209,5 +225,9 @@ contract GhostFundVault is IReceiver, OwnerIsCreator, ReentrancyGuard {
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(IReceiver).interfaceId;
+    }
+
+    receive() external payable {
+        revert();
     }
 }
