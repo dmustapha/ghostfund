@@ -14,6 +14,14 @@ Compliant private yield vault that automates Aave V3 strategy monitoring, moves 
 
 ---
 
+## Live Demo
+
+**[https://frontend-fh4efi8rt-damilolas-projects-fafdf859.vercel.app](https://frontend-fh4efi8rt-damilolas-projects-fafdf859.vercel.app)**
+
+Connect MetaMask on Sepolia to view live vault data, approve CRE recommendations, and interact with the vault.
+
+---
+
 ## What Is GhostFund?
 
 GhostFund V2 is a DeFi vault on Sepolia that combines three Chainlink primitives into one system. CRE (Compute Runtime Environment) monitors Aave V3 yields and recommends actions. Private Transactions hide the sender when distributing funds. ACE (Access Control Engine) enforces allowlists, deposit caps, and emergency pauses on every deposit.
