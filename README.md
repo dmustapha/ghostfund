@@ -38,9 +38,7 @@ No funds move without the vault owner's explicit approval. Every recommendation 
 
 | Dashboard | Operations |
 |-----------|------------|
-| ![Dashboard](docs/images/landing.png) | ![Operations](docs/images/operations.png) |
-
-<!-- TODO: Add screenshots after frontend deploy -->
+| <img src="docs/images/landing.png" width="600"> | <img src="docs/images/operations.png" width="600"> |
 
 ---
 
@@ -309,16 +307,6 @@ ghostfund/
     ghostfund-logo.jpg            Project logo
     ghostfund-architecture.jpg    Architecture diagram
 ```
-
----
-
-## Hackathon Tracks
-
-**Privacy Track** (primary): Private Transactions enable shielded fund movement where sender identity is hidden. GhostToken is registered in the PT Vault with a PolicyEngine that enforces compliance before any private transfer. Recipients redeem on-chain via cryptographic withdraw tickets.
-
-**DeFi and Tokenization Track** (secondary): CRE automates yield strategy monitoring on Aave V3, recommending deposit/withdraw actions based on APY thresholds with hysteresis. The human-in-the-loop approval pattern ensures no autonomous fund movement.
-
-All three Chainlink primitives (CRE, Private Transactions, ACE) work together: CRE monitors and recommends, the vault earns yield on Aave, Private Transactions enable private fund distribution, and ACE enforces compliance at every entry point.
 
 ---
 
