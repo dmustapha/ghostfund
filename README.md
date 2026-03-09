@@ -28,7 +28,7 @@ Connect MetaMask on Sepolia to view live vault data, approve CRE recommendations
 
 ## What Is GhostFund?
 
-GhostFund is a DeFi vault on Sepolia that combines three Chainlink primitives into one system. CRE (Compute Runtime Environment) monitors Aave V3 yields and recommends actions. Private Transactions hide the sender when distributing funds. ACE (Access Control Engine) enforces allowlists, deposit caps, and emergency pauses on every deposit.
+The first project combining Chainlink Private Transactions, CRE automation, and ACE compliance in a single vault. CRE monitors Aave V3 yields and writes signed recommendations on-chain. Private Transactions hide the sender when distributing funds. ACE enforces allowlists, deposit caps, and emergency pauses on every deposit.
 
 No funds move without the vault owner's explicit approval. Every recommendation expires after 1 hour if not approved.
 
