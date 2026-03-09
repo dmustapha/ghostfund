@@ -18,12 +18,10 @@ workflow/workflow/node_modules/
 .DS_Store
 workflow/workflow/.cre_build_tmp.*
 
-# Claude
+# Local
 .claude/
 docs/context/
 docs/prompts/
-CLAUDE.md
-FOR[Dami].md
 tasks/
 
 # Coverage
