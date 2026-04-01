@@ -4,8 +4,11 @@
 
 # GhostFund: Private DeFi Yield with Human-Gated Automation
 
-Compliant private yield vault that automates Aave V3 strategy monitoring, moves funds with sender privacy, and enforces deposit compliance at the smart contract level.
+**Winner — Chainlink Convergence Hackathon 2026**
 
+Compliant private yield vault that automates Aave V3 strategy monitoring, moves funds with sender privacy, and enforces deposit compliance at the smart contract level. The first DeFi vault to combine all three Chainlink primitives — CRE, Private Transactions, and ACE — into one system.
+
+[![Chainlink Convergence Winner](https://img.shields.io/badge/Chainlink_Convergence-Winner-gold?logo=chainlink)]()
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.26-363636?logo=solidity)](https://soliditylang.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Chainlink](https://img.shields.io/badge/Chainlink-CRE%20%7C%20PT%20%7C%20ACE-375BD2?logo=chainlink)](https://chain.link/)
@@ -28,7 +31,7 @@ Connect MetaMask on Sepolia to view live vault data, approve CRE recommendations
 
 ## What Is GhostFund?
 
-The first project combining Chainlink Private Transactions, CRE automation, and ACE compliance in a single vault. CRE monitors Aave V3 yields and writes signed recommendations on-chain. Private Transactions hide the sender when distributing funds. ACE enforces allowlists, deposit caps, and emergency pauses on every deposit.
+GhostFund is a DeFi vault on Sepolia that combines three Chainlink primitives into one system. CRE (Compute Runtime Environment) monitors Aave V3 yields and recommends actions. Private Transactions hide the sender when distributing funds. ACE (Access Control Engine) enforces allowlists, deposit caps, and emergency pauses on every deposit.
 
 No funds move without the vault owner's explicit approval. Every recommendation expires after 1 hour if not approved.
 
@@ -38,7 +41,9 @@ No funds move without the vault owner's explicit approval. Every recommendation 
 
 | Dashboard | Operations |
 |-----------|------------|
-| <img src="docs/images/landing.png" width="600"> | <img src="docs/images/operations.png" width="600"> |
+| ![Dashboard](docs/images/landing.png) | ![Operations](docs/images/operations.png) |
+
+<!-- TODO: Add screenshots after frontend deploy -->
 
 ---
 
@@ -307,6 +312,18 @@ ghostfund/
     ghostfund-logo.jpg            Project logo
     ghostfund-architecture.jpg    Architecture diagram
 ```
+
+---
+
+## Hackathon
+
+**Winner — Chainlink Convergence Hackathon 2026**
+
+**Privacy Track** (primary): Private Transactions enable shielded fund movement where sender identity is hidden. GhostToken is registered in the PT Vault with a PolicyEngine that enforces compliance before any private transfer. Recipients redeem on-chain via cryptographic withdraw tickets.
+
+**DeFi and Tokenization Track** (secondary): CRE automates yield strategy monitoring on Aave V3, recommending deposit/withdraw actions based on APY thresholds with hysteresis. The human-in-the-loop approval pattern ensures no autonomous fund movement.
+
+All three Chainlink primitives (CRE, Private Transactions, ACE) work together: CRE monitors and recommends, the vault earns yield on Aave, Private Transactions enable private fund distribution, and ACE enforces compliance at every entry point.
 
 ---
 
