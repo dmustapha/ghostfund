@@ -6,7 +6,7 @@
 
 **Winner — Chainlink Convergence Hackathon 2026**
 
-Compliant private yield vault that automates Aave V3 strategy monitoring, moves funds with sender privacy, and enforces deposit compliance at the smart contract level. The first DeFi vault to combine all three Chainlink primitives — CRE, Private Transactions, and ACE — into one system.
+Compliant private yield vault that automates Aave V3 strategy monitoring, moves funds with sender privacy, and enforces deposit compliance at the smart contract level. The first DeFi vault to combine all three Chainlink primitives: CRE, Private Transactions, and ACE, into one system.
 
 [![Chainlink Convergence Winner](https://img.shields.io/badge/Chainlink_Convergence-Winner-gold?logo=chainlink)]()
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.26-363636?logo=solidity)](https://soliditylang.org/)
